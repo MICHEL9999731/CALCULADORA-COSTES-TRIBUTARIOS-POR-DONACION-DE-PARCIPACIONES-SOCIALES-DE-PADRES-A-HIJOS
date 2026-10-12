@@ -25,6 +25,15 @@ Investiga en internet la empresa indicada y reúne todos los datos verificables 
 
 Fuentes recomendadas: boe.es (BORME), librebor.me, infoempresa.com, einforma.com, axesor.es, empresite.eleconomista.es, iberinform.es, datoscif.es, infocif.es, cnmv.es (si cotiza), la web corporativa, LinkedIn, prensa económica y regional. Lee las páginas de ficha de empresa cuando la búsqueda las muestre: suelen contener el CIF, los cargos y las cifras de ventas.
 
+Cuando una fuente oculte el dato (las fichas gratuitas suelen tapar cifras y socios) o no se pueda abrir, busca alternativas antes de darlo por no encontrado:
+- Busca también por la marca, el grupo o la matriz, la denominación anterior y los directivos: la prensa suele hablar del grupo.
+- Cifras: ranking-empresas.eleconomista.es, rankings de ventas por provincia, prensa sectorial y regional (Alimarket, Interempresas, diarios económicos), informes de la matriz si cotiza, estado de información no financiera.
+- Grupo y matriz: noticias de compras, webs de asesores de operaciones, registros extranjeros gratuitos (Companies House) y GLEIF.
+- Centros y plantilla: ofertas de empleo (InfoJobs, Indeed, LinkedIn), Google Maps, ferias y directorios sectoriales.
+- Ayudas y contratos: BDNS (infosubvenciones.es) y Plataforma de Contratación, buscando el CIF entre comillas.
+- Alertas: Registro Público Concursal y edictos del BOE.
+Prueba al menos dos alternativas antes de declarar un dato como no encontrado y anota dónde buscaste. Indica cuándo un dato es del grupo y no de la sociedad.
+
 Reglas:
 - Si el nombre es ambiguo (varias sociedades con nombres parecidos), identifica la más probable usando la pista disponible (CIF, provincia) y menciona las alternativas.
 - Distingue claramente lo verificado (con su URL) de lo que deduces. No inventes cifras ni personas.
