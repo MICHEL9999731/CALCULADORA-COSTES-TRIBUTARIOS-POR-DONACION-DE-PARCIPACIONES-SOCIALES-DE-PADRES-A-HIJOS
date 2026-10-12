@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1qUB1kF6F8BLRWHc0adlTcq
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Otras apps
+
+- [`prospeccion/`](prospeccion/README.md): prepara reuniones con clientes potenciales a partir del nombre o el CIF de la empresa.
