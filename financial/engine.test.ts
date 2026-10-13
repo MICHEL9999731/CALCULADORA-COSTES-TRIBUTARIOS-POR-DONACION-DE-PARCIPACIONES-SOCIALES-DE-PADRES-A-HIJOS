@@ -1,0 +1,111 @@
+import { describe, expect, it } from 'vitest';
+import { analyze, simulate, NO_LEVERS } from './engine';
+import { sampleDataset } from './sampleData';
+import { parseImport, buildTemplateCsv } from './importer';
+import { parseAmount } from './format';
+import { emptyDataset } from './schema';
+
+describe('analyze (empresa de ejemplo)', () => {
+    const a = analyze(sampleDataset());
+
+    it('cuadra balances y resultado', () => {
+        expect(a.n.activo).toBe(2_600_000);
+        expect(a.n.pnYPasivo).toBe(2_600_000);
+        expect(a.n1.activo).toBe(2_265_000);
+        expect(a.n.resultado).toBe(19_500);
+        expect(a.n1.resultado).toBe(136_500);
+        expect(a.checks.filter(c => c.severity === 'critical')).toHaveLength(0);
+    });
+
+    it('calcula EBITDA, DFN, NOF y fondo de maniobra', () => {
+        expect(a.n.ebitda).toBe(225_000);
+        expect(a.n.ebit).toBe(110_000);
+        expect(a.n.dfn).toBe(1_145_000);
+        expect(a.n.fm).toBe(321_000);
+        expect(a.n.nof).toBe(821_000);
+    });
+
+    it('el estado de flujos concilia con la variación de tesorería', () => {
+        expect(a.cashFlow.actualCashChange).toBe(-110_000);
+        expect(Math.abs(a.cashFlow.unreconciled)).toBeLessThan(0.01);
+        expect(a.cashFlow.capex).toBe(245_000);
+        expect(a.cashFlow.dividendsEstimate).toBe(80_000);
+    });
+
+    it('detecta el sobreendeudamiento y propone actuaciones', () => {
+        const lev = a.ratios.find(r => r.id === 'dfnEbitda')!;
+        expect(lev.n).toBeCloseTo(5.09, 2);
+        expect(lev.status).toBe('bad');
+        expect(a.recommendations.some(r => r.title.includes('desapalancamiento'))).toBe(true);
+        expect(a.recommendations.some(r => r.title.includes('periodo de cobro'))).toBe(true);
+        expect(a.summary.length).toBeGreaterThan(2);
+        expect(a.score).toBeGreaterThan(0);
+    });
+
+    it('el simulador sin cambios no altera nada', () => {
+        const s = simulate(a, NO_LEVERS);
+        expect(s.deltaEbitda).toBeCloseTo(0, 6);
+        expect(s.deltaWorkingCapital).toBeCloseTo(0, 6);
+    });
+
+    it('cobrar 10 días antes libera caja', () => {
+        const s = simulate(a, { ...NO_LEVERS, collectionDaysDelta: -10 });
+        expect(s.cashImpact).toBeCloseTo((4_500_000 * 1.21 / 365) * 10, 0);
+    });
+});
+
+describe('comprobaciones mercantiles', () => {
+    it('avisa de causa de disolución si el PN < 50 % del capital', () => {
+        const ds = emptyDataset();
+        Object.assign(ds.yearN, { capital: 100_000, rdosAnteriores: -70_000, efectivo: 30_000 });
+        const a = analyze(ds);
+        expect(a.checks.some(c => c.title.includes('disolución'))).toBe(true);
+    });
+
+    it('no falla con datos vacíos', () => {
+        expect(() => analyze(emptyDataset())).not.toThrow();
+    });
+});
+
+describe('importador', () => {
+    it('lee importes en formato español', () => {
+        expect(parseAmount('1.234.567,89')).toBeCloseTo(1234567.89);
+        expect(parseAmount('(1.234)')).toBe(-1234);
+        expect(parseAmount('-2.500 €')).toBe(-2500);
+        expect(parseAmount('1234.5')).toBe(1234.5);
+    });
+
+    it('reimporta la plantilla CSV', () => {
+        const ds = sampleDataset();
+        const res = parseImport(buildTemplateCsv(ds.yearN, ds.yearN1));
+        expect(res.yearN.ventas).toBe(4_500_000);
+        expect(res.yearN1.otrosAcreedores).toBe(128_500);
+    });
+
+    it('interpreta un balance pegado de las cuentas anuales', () => {
+        const text = [
+            'A) ACTIVO NO CORRIENTE\t\t1.100.000\t970.000',
+            'II. Inmovilizado material\t5\t1.035.000\t900.000',
+            'B) ACTIVO CORRIENTE\t\t1.500.000\t1.295.000',
+            'III. Deudores comerciales y otras cuentas a cobrar\t\t845.000\t660.000',
+            '1. Clientes por ventas y prestaciones de servicios\t\t800.000\t620.000',
+            '3. Deudores varios\t\t45.000\t40.000',
+            'B) PASIVO NO CORRIENTE\t\t645.000\t580.000',
+            '2. Deudas con entidades de crédito\t\t600.000\t520.000',
+            'C) PASIVO CORRIENTE\t\t1.179.000\t848.500',
+            '2. Deudas con entidades de crédito\t\t520.000\t280.000',
+            'CUENTA DE PÉRDIDAS Y GANANCIAS',
+            '1. Importe neto de la cifra de negocios\t\t4.500.000,00\t4.200.000,00',
+            '4. Aprovisionamientos\t\t(3.240.000)\t(2.940.000)',
+        ].join('\n');
+        const res = parseImport(text);
+        expect(res.yearN.inmMaterial).toBe(1_035_000);
+        expect(res.yearN.clientes).toBe(800_000);
+        expect(res.yearN.otrosDeudores).toBe(45_000);
+        expect(res.yearN.deudaBancariaLP).toBe(600_000);
+        expect(res.yearN.deudaBancariaCP).toBe(520_000);
+        expect(res.yearN1.deudaBancariaCP).toBe(280_000);
+        expect(res.yearN.ventas).toBe(4_500_000);
+        expect(res.yearN.aprovisionamientos).toBe(-3_240_000);
+    });
+});

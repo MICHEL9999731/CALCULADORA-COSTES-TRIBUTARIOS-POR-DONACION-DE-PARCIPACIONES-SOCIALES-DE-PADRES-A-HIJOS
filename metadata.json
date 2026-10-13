@@ -1,5 +1,5 @@
 {
-  "name": "Calculadora Fiscal de Donación de Participaciones",
-  "description": "Una aplicación para calcular el coste fiscal de una donación de participaciones de una sociedad de un padre a un hijo en la Comunidad de Madrid, España. Considera el IRPF, el Impuesto de Donaciones y el Impuesto sobre el Patrimonio.",
+  "name": "Dirección Financiera y Calculadora Fiscal de Donaciones",
+  "description": "Herramienta para asesores: análisis de dirección financiera (ratios, NOF, flujos de caja, solvencia, diagnóstico y plan de acción) a partir del balance y la PyG comparativos, y calculadora del coste fiscal de donar participaciones de padres a hijos en la Comunidad de Madrid.",
   "requestFramePermissions": []
 }
