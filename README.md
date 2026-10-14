@@ -42,3 +42,11 @@ El motor de cálculo está en `financial/engine.ts` y sus pruebas en `financial/
 
 ### Calculadora de donaciones
 Estima el coste fiscal (IRPF, ISD) de donar participaciones de padres a hijos en la Comunidad de Madrid.
+
+## Usarlo sin instalar nada (claude.ai)
+
+`npm run build:artifact` genera `artifact/direccion-financiera.html`, la aplicación completa en un único archivo, que se publica como Artifact en claude.ai. En esa versión:
+
+- **Mis clientes** guarda cada cliente en el espacio privado del usuario en claude.ai (en local, en el navegador).
+- **Descargar informe** genera un HTML con el informe completo; al abrirlo, Ctrl+P / Cmd+P lo guarda en PDF con fondo blanco.
+- Las plantillas y el archivo `.json` del cliente se descargan con confirmación del usuario.

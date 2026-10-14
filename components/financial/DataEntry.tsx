@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     BALANCE_LINES, BALANCE_SECTIONS, MAX_YEARS, PYG_LINES, SECTORS, emptyYearData,
     type CompanyInfo, type FinancialDataset, type LegalForm, type Sector, type YearData,
@@ -27,6 +27,7 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
     const c = data.company;
     const setCompany = (patch: Partial<CompanyInfo>) => onChange({ ...data, company: { ...c, ...patch } });
     const years = data.years;
+    const [confirmRemove, setConfirmRemove] = useState(false);
     const setYear = (i: number, patch: Partial<YearData>) =>
         onChange({ ...data, years: years.map((y, k) => (k === i ? { ...y, ...patch } : y)) });
     const setValue = (i: number, id: string, v: number | null) =>
@@ -81,7 +82,15 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="text-sm font-medium text-slate-300">Ejercicios a analizar: {years.length}</span>
                             <button type="button" disabled={years.length >= MAX_YEARS} onClick={addYear} className="px-3 py-1 rounded-md text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-40">+ Añadir {years[years.length - 1].year - 1}</button>
-                            <button type="button" disabled={years.length <= 2} onClick={() => { if (confirm(`¿Quitar el ejercicio ${years[years.length - 1].year} y sus datos?`)) removeYear(); }} className="px-3 py-1 rounded-md text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-40">− Quitar {years[years.length - 1].year}</button>
+                            {confirmRemove ? (
+                                <span className="flex items-center gap-2 text-sm">
+                                    ¿Quitar {years[years.length - 1].year} y sus datos?
+                                    <button type="button" onClick={() => { removeYear(); setConfirmRemove(false); }} className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500">Sí, quitar</button>
+                                    <button type="button" onClick={() => setConfirmRemove(false)} className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">No</button>
+                                </span>
+                            ) : (
+                                <button type="button" disabled={years.length <= 2} onClick={() => setConfirmRemove(true)} className="px-3 py-1 rounded-md text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-40">− Quitar {years[years.length - 1].year}</button>
+                            )}
                             <span className="text-xs text-slate-500">Hasta {MAX_YEARS} ejercicios. Con 3 o más se analizan tendencias.</span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">

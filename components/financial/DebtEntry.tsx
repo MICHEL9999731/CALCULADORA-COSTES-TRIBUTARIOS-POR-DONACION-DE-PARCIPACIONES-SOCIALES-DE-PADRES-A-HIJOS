@@ -14,6 +14,7 @@ const cellInput = 'w-full px-2 py-1 bg-slate-700 border border-slate-600 rounded
 
 export const DebtEntry: React.FC<Props> = ({ data, onChange }) => {
     const [paste, setPaste] = useState<string | null>(null);
+    const [pasteError, setPasteError] = useState<string | null>(null);
     const debts = data.debts;
     const yearN = data.years[0].year;
     const set = (debtsNew: DebtItem[]) => onChange({ ...data, debts: debtsNew });
@@ -29,7 +30,8 @@ export const DebtEntry: React.FC<Props> = ({ data, onChange }) => {
 
     const importPasted = (replace: boolean) => {
         const items = parseDebts(paste ?? '');
-        if (!items.length) { alert('No se ha reconocido ninguna operación. Revise el orden de las columnas.'); return; }
+        if (!items.length) { setPasteError('No se ha reconocido ninguna operación. Revise que las columnas estén en el orden indicado.'); return; }
+        setPasteError(null);
         set(replace ? items : [...debts, ...items]);
         setPaste(null);
     };
@@ -49,8 +51,9 @@ export const DebtEntry: React.FC<Props> = ({ data, onChange }) => {
 
                 {paste !== null && (
                     <div className="space-y-2 p-3 border border-slate-600 rounded-md">
-                        <p className="text-xs text-slate-400">Pegue filas con estas columnas en este orden (separadas por tabulador o «;»): <strong>{DEBT_COLUMNS.join(' · ')}</strong>. Las fechas pueden ser 06/2028 o 2028-06. Use la plantilla «Descargar cuadro de deuda» para tener las columnas preparadas.</p>
+                        <p className="text-xs text-slate-400">Pegue filas con estas columnas en este orden (separadas por tabulador o «;»): <strong>{DEBT_COLUMNS.join(' · ')}</strong>. Las fechas pueden ser 06/2028 o 2028-06. Use la «Plantilla de deuda» para tener las columnas preparadas.</p>
                         <textarea className="w-full h-32 p-2 font-mono text-xs bg-slate-900 border border-slate-600 rounded-md" value={paste} onChange={e => setPaste(e.target.value)} placeholder={'Préstamo\tBanco A\tICO maquinaria\t120.000\t\t4,5\t2.300\t06/2029\t\tPersonal socios'} />
+                        {pasteError && <p className="text-sm text-rose-300">{pasteError}</p>}
                         <div className="flex gap-2">
                             <button type="button" className="px-3 py-1.5 rounded-md text-sm bg-emerald-600 hover:bg-emerald-500" onClick={() => importPasted(false)}>Añadir a las existentes</button>
                             <button type="button" className="px-3 py-1.5 rounded-md text-sm bg-slate-700 hover:bg-slate-600" onClick={() => importPasted(true)}>Sustituir las existentes</button>

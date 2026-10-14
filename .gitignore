@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Versión de un único archivo (npm run build:artifact)
+artifact

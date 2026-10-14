@@ -55,7 +55,7 @@ export const ImportPanel: React.FC<Props> = ({ data, onApply, onClose }) => {
                     <ol className="list-decimal ml-5 space-y-1">
                         <li><strong>Pegar desde Excel o el programa de contabilidad</strong>: copie las filas del balance y de la PyG (concepto e importes, del ejercicio más reciente al más antiguo, hasta {MAX_YEARS} años) y péguelas abajo. Si copia también la fila de cabecera con los años, se asignan automáticamente. Se reconocen los epígrafes del PGC (modelos normal y abreviado), incluidos los encabezados "Activo corriente", "Pasivo no corriente"… para distinguir largo y corto plazo.</li>
                         <li><strong>Plantilla CSV</strong>: descargue la plantilla, rellénela en Excel y súbala.</li>
-                        <li><strong>Archivo .json</strong> guardado previamente con "Guardar cliente" (use el botón "Abrir cliente").</li>
+                        <li><strong>Archivo .json</strong> exportado previamente con «Exportar .json» (use el botón «Abrir .json»). Para el día a día es más cómodo «Mis clientes».</li>
                     </ol>
                 </div>
                 <textarea

@@ -3,6 +3,8 @@ import { analyze } from '../../financial/engine';
 import { emptyDataset, migrateDataset, type FinancialDataset } from '../../financial/schema';
 import { sampleDataset } from '../../financial/sampleData';
 import { buildDebtTemplateCsv, buildTemplateCsv } from '../../financial/importer';
+import { clientId, inClaude, saveFile, type SaveOutcome } from '../../financial/platform';
+import { ClientLibrary } from './ClientLibrary';
 import { DataEntry } from './DataEntry';
 import { DebtEntry } from './DebtEntry';
 import { ImportPanel } from './ImportPanel';
@@ -10,47 +12,81 @@ import { Report } from './Report';
 
 const STORAGE_KEY = 'direccion-financiera:dataset';
 
-const loadStored = (): FinancialDataset => {
+/** Recupera el último trabajo de este navegador; si no hay, abre la empresa de ejemplo. */
+const loadStored = (): { data: FinancialDataset; isSample: boolean } => {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return migrateDataset(JSON.parse(raw));
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return { data: migrateDataset(parsed.data ?? parsed), isSample: !!parsed.isSample };
+        }
     } catch { /* almacenamiento no disponible */ }
-    return emptyDataset();
+    return { data: sampleDataset(), isSample: true };
 };
-
-const download = (name: string, content: string, type: string) => {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
-
-const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'empresa';
 
 const btn = 'px-3 py-2 rounded-md text-sm font-medium bg-slate-800 border border-slate-700 hover:bg-slate-700';
 
+/** Hoja de estilos de la página, para que el informe descargado se vea igual. */
+const pageCss = (): string =>
+    Array.from(document.styleSheets).map(ss => {
+        try { return Array.from(ss.cssRules).map(r => r.cssText).join('\n'); } catch { return ''; }
+    }).join('\n');
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+
 export const FinancialDirector: React.FC = () => {
-    const [data, setData] = useState<FinancialDataset>(loadStored);
+    const initial = useMemo(loadStored, []);
+    const [data, setDataRaw] = useState<FinancialDataset>(initial.data);
+    const [isSample, setIsSample] = useState(initial.isSample);
     const [view, setView] = useState<'input' | 'report'>('input');
-    const [showImport, setShowImport] = useState(false);
-    const [printAll, setPrintAll] = useState(false);
+    const [panel, setPanel] = useState<'none' | 'import' | 'clients'>('none');
+    const [confirmNew, setConfirmNew] = useState(false);
+    const [exporting, setExporting] = useState<'html' | 'print' | null>(null);
+    const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
+    const reportRef = useRef<HTMLDivElement>(null);
+    const embedded = inClaude();
+
+    const setData = (d: FinancialDataset) => { setDataRaw(d); setIsSample(false); };
 
     useEffect(() => {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* sin almacenamiento */ }
-    }, [data]);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, isSample })); } catch { /* sin almacenamiento */ }
+    }, [data, isSample]);
+
+    useEffect(() => {
+        if (!notice) return;
+        const t = setTimeout(() => setNotice(null), 6000);
+        return () => clearTimeout(t);
+    }, [notice]);
 
     const analysis = useMemo(() => (view === 'report' ? analyze(data) : null), [data, view]);
     const hasData = Object.values(data.years[0].values).some(v => v !== 0);
 
+    const report = (outcome: SaveOutcome, what: string) => {
+        if (outcome === 'saved') setNotice({ tone: 'ok', text: `${what} descargado.` });
+        else if (outcome === 'unavailable') setNotice({ tone: 'error', text: 'Las descargas no están disponibles en esta vista. Abra la página en claude.ai con su sesión iniciada.' });
+    };
+    const offer = async (filename: string, content: string, mime: string, what: string) => report(await saveFile(filename, content, mime), what);
+
+    // Exportación del informe completo: se renderizan todas las secciones y se guarda como HTML.
     useEffect(() => {
-        if (!printAll) return;
-        const t = setTimeout(() => { window.print(); setPrintAll(false); }, 300);
+        if (!exporting) return;
+        const t = setTimeout(async () => {
+            if (exporting === 'print') {
+                window.print();
+            } else if (reportRef.current) {
+                const title = `Informe financiero ${data.company.name || ''} ${data.years[0].year}`.trim();
+                const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${pageCss()}</style></head>`
+                    + `<body class="bg-slate-900 text-slate-200"><div class="max-w-6xl mx-auto p-6">`
+                    + `<p class="print:hidden text-sm text-slate-400 mb-6">Para guardarlo en PDF pulse Ctrl+P (Cmd+P en Mac) y elija «Guardar como PDF»: se imprimirá en fondo blanco.</p>`
+                    + reportRef.current.innerHTML + `</div></body></html>`;
+                await offer(`informe-${clientId(data)}-${data.years[0].year}.html`, html, 'text/html', 'Informe');
+            }
+            setExporting(null);
+        }, 300);
         return () => clearTimeout(t);
-    }, [printAll]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [exporting]);
 
     const openJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0];
@@ -59,58 +95,94 @@ export const FinancialDirector: React.FC = () => {
         try {
             setData(migrateDataset(JSON.parse(await f.text())));
             setView('input');
+            setNotice({ tone: 'ok', text: `Cliente «${f.name}» abierto.` });
         } catch {
-            alert('El archivo no es un cliente válido (.json guardado desde esta herramienta).');
+            setNotice({ tone: 'error', text: 'El archivo no es un cliente válido. Use un .json guardado desde esta herramienta.' });
         }
     };
+
+    const toReport = () => { setView('report'); window.scrollTo({ top: 0 }); };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap gap-2 print:hidden">
-                <button type="button" className={btn} onClick={() => setShowImport(s => !s)}>Importar datos</button>
-                <button type="button" className={btn} onClick={() => download('plantilla-balance-pyg.csv', '\ufeff' + buildTemplateCsv(data.years), 'text/csv;charset=utf-8')}>Descargar plantilla CSV</button>
-                <button type="button" className={btn} onClick={() => download('cuadro-de-deuda.csv', '\ufeff' + buildDebtTemplateCsv(data.debts), 'text/csv;charset=utf-8')}>Descargar cuadro de deuda</button>
-                <button type="button" className={btn} onClick={() => download(`${slug(data.company.name)}-${data.years[0].year}.json`, JSON.stringify(data, null, 2), 'application/json')}>Guardar cliente</button>
-                <button type="button" className={btn} onClick={() => fileRef.current?.click()}>Abrir cliente</button>
+                <button type="button" className={`${btn} ${panel === 'clients' ? 'ring-2 ring-indigo-500' : ''}`} onClick={() => setPanel(p => (p === 'clients' ? 'none' : 'clients'))}>Mis clientes</button>
+                <button type="button" className={`${btn} ${panel === 'import' ? 'ring-2 ring-indigo-500' : ''}`} onClick={() => { setPanel(p => (p === 'import' ? 'none' : 'import')); setView('input'); }}>Importar datos</button>
+                <button type="button" className={btn} onClick={() => offer('plantilla-balance-pyg.csv', '﻿' + buildTemplateCsv(data.years), 'text/csv;charset=utf-8', 'Plantilla')}>Plantilla CSV</button>
+                <button type="button" className={btn} onClick={() => offer('cuadro-de-deuda.csv', '﻿' + buildDebtTemplateCsv(data.debts), 'text/csv;charset=utf-8', 'Cuadro de deuda')}>Plantilla de deuda</button>
+                <button type="button" className={btn} onClick={() => offer(`${clientId(data)}-${data.years[0].year}.json`, JSON.stringify(data, null, 2), 'application/json', 'Archivo del cliente')}>Exportar .json</button>
+                <button type="button" className={btn} onClick={() => fileRef.current?.click()}>Abrir .json</button>
                 <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={openJson} />
-                <button type="button" className={btn} onClick={() => { setData(sampleDataset()); setView('input'); }}>Cargar ejemplo</button>
-                <button type="button" className={btn} onClick={() => { if (confirm('¿Borrar todos los datos introducidos?')) { setData(emptyDataset()); setView('input'); } }}>Nuevo</button>
-                <div className="ml-auto flex gap-2">
+                <button type="button" className={btn} onClick={() => { setDataRaw(sampleDataset()); setIsSample(true); setView('input'); }}>Cargar ejemplo</button>
+                {!confirmNew ? (
+                    <button type="button" className={btn} onClick={() => setConfirmNew(true)}>Nuevo</button>
+                ) : (
+                    <span className="flex items-center gap-2 px-3 py-1 rounded-md border border-rose-700 bg-rose-950/40 text-sm">
+                        ¿Borrar los datos en pantalla?
+                        <button type="button" className="px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 font-semibold" onClick={() => { setData(emptyDataset()); setView('input'); setConfirmNew(false); }}>Sí, empezar de cero</button>
+                        <button type="button" className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" onClick={() => setConfirmNew(false)}>No</button>
+                    </span>
+                )}
+                <div className="ml-auto flex flex-wrap gap-2">
                     {view === 'report' && (
                         <>
                             <button type="button" className={btn} onClick={() => setView('input')}>← Editar datos</button>
-                            <button type="button" className="px-4 py-2 rounded-md text-sm font-semibold bg-slate-200 text-slate-900 hover:bg-white" onClick={() => setPrintAll(true)}>Imprimir / PDF</button>
+                            <button type="button" disabled={!!exporting} className="px-4 py-2 rounded-md text-sm font-semibold bg-slate-200 text-slate-900 hover:bg-white disabled:opacity-50" onClick={() => setExporting('html')}>
+                                {exporting === 'html' ? 'Preparando…' : 'Descargar informe'}
+                            </button>
+                            {!embedded && <button type="button" className={btn} onClick={() => setExporting('print')}>Imprimir / PDF</button>}
                         </>
                     )}
                     {view === 'input' && (
-                        <button type="button" disabled={!hasData} className="px-5 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={() => { setView('report'); window.scrollTo({ top: 0 }); }}>
+                        <button type="button" disabled={!hasData} className="px-5 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={toReport}>
                             Generar informe →
                         </button>
                     )}
                 </div>
             </div>
 
-            {showImport && view === 'input' && <ImportPanel data={data} onApply={setData} onClose={() => setShowImport(false)} />}
+            {notice && (
+                <div role="status" className={`print:hidden px-4 py-2 rounded-md text-sm border ${notice.tone === 'ok' ? 'border-emerald-700 bg-emerald-950/40 text-emerald-200' : 'border-rose-700 bg-rose-950/40 text-rose-200'}`}>
+                    {notice.text}
+                </div>
+            )}
+
+            {isSample && (
+                <div className="print:hidden px-4 py-3 rounded-md border border-amber-700 bg-amber-950/30 text-sm text-amber-100">
+                    Está viendo <strong>Distribuciones Ejemplo, S.L.</strong>, una empresa ficticia para probar la herramienta. Pulse «Generar informe» para ver el resultado, o «Nuevo» / «Importar datos» para trabajar con un cliente real.
+                </div>
+            )}
+
+            {panel === 'clients' && (
+                <ClientLibrary
+                    current={data}
+                    onOpen={d => { setData(d); setView('input'); setPanel('none'); setNotice({ tone: 'ok', text: `Cliente «${d.company.name || 'sin nombre'}» abierto.` }); }}
+                    onSaved={name => setNotice({ tone: 'ok', text: `«${name}» guardado en Mis clientes.` })}
+                    onError={text => setNotice({ tone: 'error', text })}
+                />
+            )}
+
+            {panel === 'import' && view === 'input' && <ImportPanel data={data} onApply={setData} onClose={() => setPanel('none')} />}
 
             {view === 'input' && <DataEntry data={data} onChange={setData} />}
             {view === 'input' && <DebtEntry data={data} onChange={setData} />}
 
             {view === 'input' && (
                 <div className="flex justify-end">
-                    <button type="button" disabled={!hasData} className="px-6 py-3 rounded-md text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={() => { setView('report'); window.scrollTo({ top: 0 }); }}>
+                    <button type="button" disabled={!hasData} className="px-6 py-3 rounded-md text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={toReport}>
                         Generar informe del director financiero →
                     </button>
                 </div>
             )}
 
             {view === 'report' && analysis && (
-                <>
-                    <div className="hidden print:block mb-6">
+                <div ref={reportRef}>
+                    <div className={exporting ? 'mb-6' : 'hidden print:block mb-6'}>
                         <h1 className="text-3xl font-bold">Informe de dirección financiera</h1>
                         <p>{data.company.name} {data.company.cif && `· ${data.company.cif}`} · Ejercicios {data.years[data.years.length - 1].year}-{data.years[0].year} · Emitido el {new Date().toLocaleDateString('es-ES')}</p>
                     </div>
-                    <Report analysis={analysis} printAll={printAll} />
-                </>
+                    <Report analysis={analysis} printAll={!!exporting} />
+                </div>
             )}
         </div>
     );
