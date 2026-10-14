@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
+      build: {
+        // Un único archivo JS: la versión para claude.ai se publica como una sola página.
+        rollupOptions: { output: { inlineDynamicImports: true } },
+        chunkSizeWarningLimit: 4000,
+      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
