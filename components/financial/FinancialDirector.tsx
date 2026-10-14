@@ -5,6 +5,7 @@ import { sampleDataset } from '../../financial/sampleData';
 import { buildDebtTemplateCsv, buildTemplateCsv } from '../../financial/importer';
 import { clientId, inClaude, saveFile, type SaveOutcome } from '../../financial/platform';
 import { ClientLibrary } from './ClientLibrary';
+import { DocumentPanel } from './DocumentPanel';
 import { DataEntry } from './DataEntry';
 import { DebtEntry } from './DebtEntry';
 import { ImportPanel } from './ImportPanel';
@@ -39,7 +40,7 @@ export const FinancialDirector: React.FC = () => {
     const [data, setDataRaw] = useState<FinancialDataset>(initial.data);
     const [isSample, setIsSample] = useState(initial.isSample);
     const [view, setView] = useState<'input' | 'report'>('input');
-    const [panel, setPanel] = useState<'none' | 'import' | 'clients'>('none');
+    const [panel, setPanel] = useState<'none' | 'import' | 'clients' | 'docs'>('none');
     const [confirmNew, setConfirmNew] = useState(false);
     const [exporting, setExporting] = useState<'html' | 'print' | null>(null);
     const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -106,8 +107,9 @@ export const FinancialDirector: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap gap-2 print:hidden">
+                <button type="button" className={`px-3 py-2 rounded-md text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white ${panel === 'docs' ? 'ring-2 ring-indigo-300' : ''}`} onClick={() => { setPanel(p => (p === 'docs' ? 'none' : 'docs')); setView('input'); }}>Cargar documentos (Excel / PDF)</button>
                 <button type="button" className={`${btn} ${panel === 'clients' ? 'ring-2 ring-indigo-500' : ''}`} onClick={() => setPanel(p => (p === 'clients' ? 'none' : 'clients'))}>Mis clientes</button>
-                <button type="button" className={`${btn} ${panel === 'import' ? 'ring-2 ring-indigo-500' : ''}`} onClick={() => { setPanel(p => (p === 'import' ? 'none' : 'import')); setView('input'); }}>Importar datos</button>
+                <button type="button" className={`${btn} ${panel === 'import' ? 'ring-2 ring-indigo-500' : ''}`} onClick={() => { setPanel(p => (p === 'import' ? 'none' : 'import')); setView('input'); }}>Pegar datos</button>
                 <button type="button" className={btn} onClick={() => offer('plantilla-balance-pyg.csv', '﻿' + buildTemplateCsv(data.years), 'text/csv;charset=utf-8', 'Plantilla')}>Plantilla CSV</button>
                 <button type="button" className={btn} onClick={() => offer('cuadro-de-deuda.csv', '﻿' + buildDebtTemplateCsv(data.debts), 'text/csv;charset=utf-8', 'Cuadro de deuda')}>Plantilla de deuda</button>
                 <button type="button" className={btn} onClick={() => offer(`${clientId(data)}-${data.years[0].year}.json`, JSON.stringify(data, null, 2), 'application/json', 'Archivo del cliente')}>Exportar .json</button>
@@ -149,7 +151,7 @@ export const FinancialDirector: React.FC = () => {
 
             {isSample && (
                 <div className="print:hidden px-4 py-3 rounded-md border border-amber-700 bg-amber-950/30 text-sm text-amber-100">
-                    Está viendo <strong>Distribuciones Ejemplo, S.L.</strong>, una empresa ficticia para probar la herramienta. Pulse «Generar informe» para ver el resultado, o «Nuevo» / «Importar datos» para trabajar con un cliente real.
+                    Está viendo <strong>Distribuciones Ejemplo, S.L.</strong>, una empresa ficticia para probar la herramienta. Pulse «Generar informe» para ver el resultado, o «Cargar documentos» para trabajar con un cliente real.
                 </div>
             )}
 
@@ -159,6 +161,15 @@ export const FinancialDirector: React.FC = () => {
                     onOpen={d => { setData(d); setView('input'); setPanel('none'); setNotice({ tone: 'ok', text: `Cliente «${d.company.name || 'sin nombre'}» abierto.` }); }}
                     onSaved={name => setNotice({ tone: 'ok', text: `«${name}» guardado en Mis clientes.` })}
                     onError={text => setNotice({ tone: 'error', text })}
+                />
+            )}
+
+            {panel === 'docs' && view === 'input' && (
+                <DocumentPanel
+                    data={data}
+                    replaceByDefault={isSample || !hasData}
+                    onApply={(d, summary) => { setData(d); setPanel('none'); setNotice({ tone: 'ok', text: summary }); window.scrollTo({ top: 0 }); }}
+                    onClose={() => setPanel('none')}
                 />
             )}
 

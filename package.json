@@ -12,8 +12,10 @@
     "build:artifact": "node scripts/build-artifact.mjs"
   },
   "dependencies": {
+    "pdfjs-dist": "^3.11.174",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

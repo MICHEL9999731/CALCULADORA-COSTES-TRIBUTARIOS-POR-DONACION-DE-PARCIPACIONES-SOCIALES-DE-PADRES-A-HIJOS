@@ -157,3 +157,44 @@ export async function getClientStore(): Promise<ClientStore | null> {
         },
     };
 }
+
+// ---------------------------------------------------------------------------
+// Lectura de documentos con Claude (capacidad "sample")
+// ---------------------------------------------------------------------------
+
+export interface DocumentReader {
+    /** Máximo de imágenes por consulta (0 si esta vista no puede enviar imágenes). */
+    maxImages: number;
+    json(prompt: string, options: { images?: Blob[]; signal?: AbortSignal }): Promise<any>;
+}
+
+export interface ReaderError { code: string; message: string }
+
+/** Devuelve el lector de documentos con Claude, o null si no está disponible (p. ej. en local). */
+export async function getDocumentReader(): Promise<DocumentReader | null> {
+    const sample = await capability('sample');
+    if (!sample) return null;
+    let maxImages = 0;
+    try {
+        const limits = await sample.limits();
+        maxImages = limits?.images?.maxCount ?? 0;
+    } catch { maxImages = 0; }
+    return {
+        maxImages,
+        json: (prompt, { images, signal }) =>
+            sample.json(prompt, { modelTier: 'default', cache: false, signal, ...(images && images.length ? { images } : {}) }),
+    };
+}
+
+/** Texto para el usuario según el código de error de una consulta a Claude. */
+export function readerErrorText(code: string): string {
+    switch (code) {
+        case 'not_granted': return 'No se ha dado permiso a la página para consultar a Claude. Puede activarlo en el menú de permisos del artefacto.';
+        case 'rate_limited': return 'Demasiadas consultas seguidas o límite de uso alcanzado. Espere un momento y vuelva a intentarlo.';
+        case 'prompt_too_large': return 'El documento es demasiado grande para leerlo de una vez. Divídalo (por ejemplo, solo las páginas del balance y la PyG).';
+        case 'invalid_json': return 'Claude no ha devuelto los datos en el formato esperado. Vuelva a intentarlo.';
+        case 'cancelled': return 'Lectura cancelada.';
+        case 'images_unavailable': case 'image_rejected': return 'No se han podido enviar las páginas escaneadas a Claude.';
+        default: return 'No se ha podido completar la lectura. Vuelva a intentarlo en unos minutos.';
+    }
+}

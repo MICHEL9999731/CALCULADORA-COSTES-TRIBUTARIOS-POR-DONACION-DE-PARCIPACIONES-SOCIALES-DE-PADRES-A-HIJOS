@@ -180,6 +180,17 @@ export const DEBT_TYPES: { id: DebtType; label: string; hint: string }[] = [
     { id: 'otro', label: 'Otra financiación', hint: '' },
 ];
 
+/** Una fila de un cuadro de amortización. */
+export interface AmortRow {
+    /** Fecha de la cuota, "AAAA-MM-DD". */
+    date: string;
+    payment: number;
+    interest: number;
+    principal: number;
+    /** Capital pendiente después de pagar esta cuota. */
+    balance: number;
+}
+
 /** Una operación de financiación o compromiso de pago vigente al cierre del último ejercicio. */
 export interface DebtItem {
     id: string;
@@ -200,6 +211,10 @@ export interface DebtItem {
     graceUntil: string;
     /** Garantías: personal de los socios, hipotecaria, ICO, pignoración… */
     guarantee: string;
+    /** Cuotas pendientes tras el cierre, leídas del cuadro de amortización del banco (si se aportó). */
+    schedule?: AmortRow[];
+    /** Documento del que se leyó la operación y resultado de la comprobación del cuadro. */
+    source?: { file: string; rows: number; verified: boolean; issues: number };
 }
 
 export const MAX_YEARS = 5;

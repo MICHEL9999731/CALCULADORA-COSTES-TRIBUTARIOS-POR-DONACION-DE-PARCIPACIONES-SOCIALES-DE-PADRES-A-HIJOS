@@ -106,6 +106,24 @@ function scheduleLine(item: DebtItem, yearN: number): DebtLineResult {
         return { item, typeLabel: label(item.type), revolving, offBalance, monthsLeft, principalByYear, interestByYear, balloon, pendingCommitment, warnings };
     }
 
+    // Cuadro de amortización real del banco: se usan sus cuotas tal cual.
+    if (item.schedule && item.schedule.length) {
+        for (const row of item.schedule) {
+            const m = monthsFrom(yearN, row.date.slice(0, 7));
+            if (m === null || m < 1) continue;
+            principalByYear[bucket(m)] += row.principal;
+            interestByYear[bucket(m)] += row.interest;
+        }
+        const last = item.schedule[item.schedule.length - 1];
+        const usual = item.schedule[0].payment;
+        if (last.principal > Math.max(1, usual * 1.5)) {
+            balloon = last.principal;
+            warnings.push('Hay un pago final (cuota balón o residual) relevante al vencimiento.');
+        }
+        if (last.balance > 1) warnings.push(`El cuadro aportado termina con ${Math.round(last.balance).toLocaleString('es-ES')} € pendientes.`);
+        return { item, typeLabel: label(item.type), revolving, offBalance, monthsLeft, principalByYear, interestByYear, balloon, pendingCommitment, warnings };
+    }
+
     let bal = Math.max(item.outstanding, 0);
     if (bal === 0) return { item, typeLabel: label(item.type), revolving, offBalance, monthsLeft, principalByYear, interestByYear, balloon, pendingCommitment, warnings };
     if (item.rate === null) warnings.push('Falta el tipo de interés: se calcula sin intereses.');

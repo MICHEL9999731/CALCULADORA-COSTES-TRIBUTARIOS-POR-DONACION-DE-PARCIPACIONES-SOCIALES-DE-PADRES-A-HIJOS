@@ -47,6 +47,7 @@ Estima el coste fiscal (IRPF, ISD) de donar participaciones de padres a hijos en
 
 `npm run build:artifact` genera `artifact/direccion-financiera.html`, la aplicación completa en un único archivo, que se publica como Artifact en claude.ai. En esa versión:
 
+- **Cargar documentos (Excel / PDF)**: lee cuentas anuales, balances, cuentas de resultados, cuadros de amortización, leasing, renting y pólizas, y rellena los datos. Los cuadros de amortización se comprueban fila a fila (pendiente anterior − amortización = pendiente; cuota = intereses + amortización) y las cuentas con el cuadre del balance y del resultado; si algo no cuadra se pide una relectura dirigida y lo que siga sin cuadrar se señala antes de aplicar. La lectura de PDF y de formatos libres usa Claude desde la propia página; en local solo se leen Excel/CSV con epígrafes del PGC.
 - **Mis clientes** guarda cada cliente en el espacio privado del usuario en claude.ai (en local, en el navegador).
 - **Descargar informe** genera un HTML con el informe completo; al abrirlo, Ctrl+P / Cmd+P lo guarda en PDF con fondo blanco.
 - Las plantillas y el archivo `.json` del cliente se descargan con confirmación del usuario.
