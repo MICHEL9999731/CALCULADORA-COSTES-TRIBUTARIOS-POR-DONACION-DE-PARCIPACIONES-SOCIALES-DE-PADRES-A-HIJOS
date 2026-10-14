@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { parseImport, type ImportResult } from '../../financial/importer';
-import { BALANCE_LINES, PYG_LINES, type FinancialDataset } from '../../financial/schema';
+import { BALANCE_LINES, MAX_YEARS, PYG_LINES, emptyYear, emptyYearData, type FinancialDataset, type YearData } from '../../financial/schema';
 import { eur } from '../../financial/format';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 
@@ -28,11 +28,21 @@ export const ImportPanel: React.FC<Props> = ({ data, onApply, onClose }) => {
     const apply = () => {
         if (!result) return;
         const merge = (base: Record<string, number>, add: Partial<Record<string, number>>) => {
-            const out = replace ? Object.fromEntries(Object.keys(base).map(k => [k, 0])) : { ...base };
+            const out = replace ? emptyYear() : { ...base };
             for (const [k, v] of Object.entries(add)) if (typeof v === 'number') out[k] = v;
             return out;
         };
-        onApply({ ...data, yearN: merge(data.yearN, result.yearN), yearN1: merge(data.yearN1, result.yearN1) });
+        // Si la cabecera trae años se usan; si no, la primera columna es el último ejercicio.
+        const firstYear = result.years[0] ?? data.years[0].year;
+        const count = Math.min(MAX_YEARS, Math.max(replace ? 2 : data.years.length, result.columns.length));
+        const years: YearData[] = Array.from({ length: count }, (_, i) => {
+            const year = result.years[i] ?? firstYear - i;
+            const existing = data.years.find(y => y.year === year) ?? emptyYearData(year);
+            return i < result.columns.length
+                ? { ...existing, year, values: merge(existing.values, result.columns[i]) }
+                : { ...(replace ? emptyYearData(year) : existing), year };
+        });
+        onApply({ ...data, years });
         onClose();
     };
 
@@ -43,7 +53,7 @@ export const ImportPanel: React.FC<Props> = ({ data, onApply, onClose }) => {
                 <div className="text-sm text-slate-400 space-y-1">
                     <p>Tres formas de cargar los datos:</p>
                     <ol className="list-decimal ml-5 space-y-1">
-                        <li><strong>Pegar desde Excel o el programa de contabilidad</strong>: copie las filas del balance y de la PyG (concepto, importe {data.company.yearN}, importe {data.company.yearN - 1}) y péguelas abajo. Se reconocen los epígrafes del PGC (modelos normal y abreviado), incluidos los encabezados "Activo corriente", "Pasivo no corriente"… para distinguir largo y corto plazo.</li>
+                        <li><strong>Pegar desde Excel o el programa de contabilidad</strong>: copie las filas del balance y de la PyG (concepto e importes, del ejercicio más reciente al más antiguo, hasta {MAX_YEARS} años) y péguelas abajo. Si copia también la fila de cabecera con los años, se asignan automáticamente. Se reconocen los epígrafes del PGC (modelos normal y abreviado), incluidos los encabezados "Activo corriente", "Pasivo no corriente"… para distinguir largo y corto plazo.</li>
                         <li><strong>Plantilla CSV</strong>: descargue la plantilla, rellénela en Excel y súbala.</li>
                         <li><strong>Archivo .json</strong> guardado previamente con "Guardar cliente" (use el botón "Abrir cliente").</li>
                     </ol>
@@ -80,8 +90,7 @@ export const ImportPanel: React.FC<Props> = ({ data, onApply, onClose }) => {
                                     <tr>
                                         <th className="text-left p-2">Línea pegada</th>
                                         <th className="text-left p-2">Se asigna a</th>
-                                        <th className="text-right p-2">{data.company.yearN}</th>
-                                        <th className="text-right p-2">{data.company.yearN - 1}</th>
+                                        {result.columns.map((_, i) => <th key={i} className="text-right p-2">{result.years[i] ?? (data.years[0].year - i)}</th>)}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -89,8 +98,7 @@ export const ImportPanel: React.FC<Props> = ({ data, onApply, onClose }) => {
                                         <tr key={i} className={`border-t border-slate-800 ${l.id && !l.ignoredReason ? '' : 'text-slate-500'}`}>
                                             <td className="p-2">{l.label}</td>
                                             <td className="p-2">{l.id && !l.ignoredReason ? <span className="text-emerald-300">{labelOf(l.id)}</span> : l.ignoredReason}</td>
-                                            <td className="p-2 text-right tabular-nums">{eur(l.n)}</td>
-                                            <td className="p-2 text-right tabular-nums">{eur(l.n1)}</td>
+                                            {result.columns.map((_, i) => <td key={i} className="p-2 text-right tabular-nums">{eur(l.values[i])}</td>)}
                                         </tr>
                                     ))}
                                 </tbody>

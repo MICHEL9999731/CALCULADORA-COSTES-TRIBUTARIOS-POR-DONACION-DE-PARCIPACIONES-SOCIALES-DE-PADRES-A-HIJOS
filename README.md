@@ -22,7 +22,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1qUB1kF6F8BLRWHc0adlTcq
 ## Herramientas incluidas
 
 ### Dirección financiera
-A partir del **balance y la cuenta de pérdidas y ganancias de dos ejercicios** (formato PGC) genera el informe de un director financiero:
+A partir del **balance y la cuenta de pérdidas y ganancias de 2 a 5 ejercicios** (formato PGC) y, opcionalmente, del **cuadro de financiación** (préstamos, hipotecas, leasing, renting, pólizas, préstamos de socios y aplazamientos), genera el informe de un director financiero:
 
 - **Resumen ejecutivo** con una valoración global (0-100) y los principales indicadores.
 - **Diagnóstico** de fortalezas y debilidades, y **plan de acción** priorizado con el impacto estimado en euros.
@@ -31,10 +31,12 @@ A partir del **balance y la cuenta de pérdidas y ganancias de dos ejercicios** 
 - **Fondo de maniobra frente a NOF**, deuda financiera neta, capacidad de endeudamiento, DSCR y años de devolución.
 - **Estado de flujos de efectivo** estimado (método indirecto), conciliado con la variación de tesorería.
 - **Riesgo**: Z-score de Altman, punto muerto, causa de disolución (art. 363 LSC) y reducción obligatoria de capital (art. 327 LSC).
+- **Evolución plurianual**: crecimiento medio anual, tendencias de márgenes, deuda, circulante y caja libre acumulada.
+- **Calendario de deuda**: cuotas de principal, intereses y renting de los próximos 5 años frente a la caja operativa (DSCR por año), coste medio ponderado, disponible en pólizas, vencimientos a renovar, avales personales y deuda más cara a cancelar.
 - **Simulador** de palancas (ventas, margen, costes, días de cobro/pago/existencias).
 - Lista de **información a solicitar al cliente**.
 
-Los datos se pueden introducir a mano, pegar desde Excel / el programa de contabilidad / el depósito de cuentas, o cargar con la plantilla CSV. Cada cliente se puede guardar y abrir en `.json`, y el informe se imprime o exporta a PDF.
+Los datos se pueden introducir a mano, pegar desde Excel / el programa de contabilidad / el depósito de cuentas, o cargar con la plantilla CSV. El cuadro de financiación se puede pegar desde Excel (plantilla «Descargar cuadro de deuda»). Cada cliente se puede guardar y abrir en `.json`, y el informe se imprime o exporta a PDF.
 
 El motor de cálculo está en `financial/engine.ts` y sus pruebas en `financial/engine.test.ts` (`npm test`).
 

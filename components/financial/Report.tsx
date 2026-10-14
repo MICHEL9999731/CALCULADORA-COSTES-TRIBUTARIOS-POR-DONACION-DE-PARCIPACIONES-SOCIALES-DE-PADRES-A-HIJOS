@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Analysis, Finding, Ratio, RowComparison, Status } from '../../financial/engine';
 import { eur, fmt, pct, signedPct, times, isNum } from '../../financial/format';
 import { Simulator } from './Simulator';
+import { DebtPlanSection, EvolutionSection } from './ReportExtra';
 
 // ---------------------------------------------------------------------------
 // Piezas comunes
@@ -301,8 +302,11 @@ const FinancingSection: React.FC<{ a: Analysis }> = ({ a }) => {
                     <dl className="grid grid-cols-2 gap-3 mt-4 text-sm">
                         <div><dt className="text-slate-400">Capacidad de deuda adicional (hasta {times(a.company.targetLeverage)} EBITDA)</dt><dd className="font-semibold tabular-nums">{eur(debt.capacity)}</dd></div>
                         <div><dt className="text-slate-400">Años para devolver la DFN con el flujo libre</dt><dd className="font-semibold tabular-nums">{isNum(debt.yearsToRepay) ? `${debt.yearsToRepay.toFixed(1)} años` : 'No calculable (flujo libre negativo)'}</dd></div>
-                        <div><dt className="text-slate-400">Cobertura del servicio de la deuda (DSCR)</dt><dd className="font-semibold tabular-nums">{times(debt.dscr)} <span className="text-xs font-normal text-slate-500">(principal {eur(debt.debtServiceUsed)} + intereses)</span></dd></div>
+                        <div><dt className="text-slate-400">Cobertura del servicio de la deuda (DSCR)</dt><dd className="font-semibold tabular-nums">{times(debt.dscr)} <span className="text-xs font-normal text-slate-500">(principal {eur(debt.debtServiceUsed)} + intereses {eur(debt.interestUsed)}{debt.source === 'detalle' ? ', según cuadro de financiación' : debt.source === 'balance' ? ', estimado con la deuda a corto del balance' : ''})</span></dd></div>
                         <div><dt className="text-slate-400">Deuda a corto sobre deuda total</dt><dd className="font-semibold tabular-nums">{pct(debt.shortTermShare)}</dd></div>
+                        {isNum(debt.adjustedDfn) && (
+                            <div><dt className="text-slate-400">DFN ajustada con renting pendiente</dt><dd className="font-semibold tabular-nums">{eur(debt.adjustedDfn)}</dd></div>
+                        )}
                         {isNum(debt.availableCreditLines) && (
                             <div><dt className="text-slate-400">Liquidez total disponible (caja + pólizas)</dt><dd className="font-semibold tabular-nums">{eur(n.liquidez + debt.availableCreditLines)}</dd></div>
                         )}
@@ -445,7 +449,9 @@ const TABS = [
     { id: 'pyg', label: 'PyG', C: ProfitAndLoss },
     { id: 'balance', label: 'Balance', C: BalanceSheet },
     { id: 'ratios', label: 'Ratios', C: RatiosSection },
+    { id: 'evolucion', label: 'Evolución', C: EvolutionSection },
     { id: 'financiacion', label: 'Deuda y solvencia', C: FinancingSection },
+    { id: 'deuda', label: 'Calendario de deuda', C: DebtPlanSection },
     { id: 'flujos', label: 'Flujos de caja', C: CashFlowSection },
     { id: 'simulador', label: 'Simulador', C: Simulator },
     { id: 'preguntas', label: 'Info. a pedir', C: Questions },
@@ -456,7 +462,7 @@ export const Report: React.FC<{ analysis: Analysis; printAll: boolean }> = ({ an
     if (printAll) {
         return (
             <div className="space-y-10">
-                {TABS.filter(t => t.id !== 'simulador').map(t => <t.C key={t.id} a={analysis} />)}
+                {TABS.filter(t => t.id !== 'simulador' && (t.id !== 'deuda' || analysis.debtPlan)).map(t => <t.C key={t.id} a={analysis} />)}
             </div>
         );
     }

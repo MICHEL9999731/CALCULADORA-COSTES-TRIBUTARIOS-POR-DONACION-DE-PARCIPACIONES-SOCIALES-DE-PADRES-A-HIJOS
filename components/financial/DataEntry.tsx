@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
-    BALANCE_LINES, BALANCE_SECTIONS, PYG_LINES, SECTORS,
-    type CompanyInfo, type FinancialDataset, type LegalForm, type Sector,
+    BALANCE_LINES, BALANCE_SECTIONS, MAX_YEARS, PYG_LINES, SECTORS, emptyYearData,
+    type CompanyInfo, type FinancialDataset, type LegalForm, type Sector, type YearData,
 } from '../../financial/schema';
 import { computeFigures, normalizeYear } from '../../financial/engine';
 import { eur } from '../../financial/format';
@@ -26,11 +26,19 @@ const textInput = 'w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded
 export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
     const c = data.company;
     const setCompany = (patch: Partial<CompanyInfo>) => onChange({ ...data, company: { ...c, ...patch } });
-    const setValue = (year: 'yearN' | 'yearN1', id: string, v: number | null) =>
-        onChange({ ...data, [year]: { ...data[year], [id]: v ?? 0 } });
+    const years = data.years;
+    const setYear = (i: number, patch: Partial<YearData>) =>
+        onChange({ ...data, years: years.map((y, k) => (k === i ? { ...y, ...patch } : y)) });
+    const setValue = (i: number, id: string, v: number | null) =>
+        setYear(i, { values: { ...years[i].values, [id]: v ?? 0 } });
+    const setLastYear = (year: number) =>
+        onChange({ ...data, years: years.map((y, k) => ({ ...y, year: year - k })) });
+    const addYear = () => onChange({ ...data, years: [...years, emptyYearData(years[years.length - 1].year - 1)] });
+    const removeYear = () => onChange({ ...data, years: years.slice(0, -1) });
 
-    const figN = useMemo(() => computeFigures(normalizeYear(data.yearN).values), [data.yearN]);
-    const figN1 = useMemo(() => computeFigures(normalizeYear(data.yearN1).values), [data.yearN1]);
+    const figs = useMemo(() => years.map(y => computeFigures(normalizeYear(y.values).values)), [years]);
+    const yearN = years[0].year;
+    const colW = years.length > 3 ? 'w-32' : 'w-40';
 
     const totalFor = (fig: ReturnType<typeof computeFigures>, s: string) =>
         ({ anc: fig.anc, ac: fig.ac, pn: fig.pn, pnc: fig.pnc, pc: fig.pc } as Record<string, number>)[s];
@@ -54,8 +62,8 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Field label="Razón social"><input className={textInput} value={c.name} onChange={e => setCompany({ name: e.target.value })} /></Field>
                     <Field label="CIF"><input className={textInput} value={c.cif} onChange={e => setCompany({ cif: e.target.value })} /></Field>
-                    <Field label="Ejercicio analizado (N)">
-                        <input type="number" className={textInput} value={c.yearN} onChange={e => setCompany({ yearN: parseInt(e.target.value, 10) || c.yearN })} />
+                    <Field label="Último ejercicio cerrado (N)" hint="Los anteriores se numeran automáticamente.">
+                        <input type="number" className={textInput} value={yearN} onChange={e => { const v = parseInt(e.target.value, 10); if (v >= 1990 && v <= 2100) setLastYear(v); }} />
                     </Field>
                     <Field label="Sector" hint="Ajusta las referencias de los ratios y el modelo de Altman.">
                         <select className={textInput} value={c.sector} onChange={e => setCompany({ sector: e.target.value as Sector })}>
@@ -69,9 +77,20 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                             <option value="otra">Otra</option>
                         </select>
                     </Field>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Field label={`Plantilla media ${c.yearN}`}><AmountInput allowEmpty value={c.employeesN} onChange={v => setCompany({ employeesN: v })} placeholder="—" /></Field>
-                        <Field label={`Plantilla media ${c.yearN - 1}`}><AmountInput allowEmpty value={c.employeesN1} onChange={v => setCompany({ employeesN1: v })} placeholder="—" /></Field>
+                    <div className="md:col-span-3 space-y-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-sm font-medium text-slate-300">Ejercicios a analizar: {years.length}</span>
+                            <button type="button" disabled={years.length >= MAX_YEARS} onClick={addYear} className="px-3 py-1 rounded-md text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-40">+ Añadir {years[years.length - 1].year - 1}</button>
+                            <button type="button" disabled={years.length <= 2} onClick={() => { if (confirm(`¿Quitar el ejercicio ${years[years.length - 1].year} y sus datos?`)) removeYear(); }} className="px-3 py-1 rounded-md text-sm bg-slate-700 hover:bg-slate-600 disabled:opacity-40">− Quitar {years[years.length - 1].year}</button>
+                            <span className="text-xs text-slate-500">Hasta {MAX_YEARS} ejercicios. Con 3 o más se analizan tendencias.</span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            {years.map((y, i) => (
+                                <Field key={y.year} label={`Plantilla media ${y.year}`}>
+                                    <AmountInput allowEmpty value={y.employees} onChange={v => setYear(i, { employees: v })} placeholder="—" />
+                                </Field>
+                            ))}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -85,29 +104,28 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                             <thead>
                                 <tr className="text-slate-400">
                                     <th className="text-left font-medium py-2">Partida</th>
-                                    <th className="w-40 text-right font-medium">{c.yearN}</th>
-                                    <th className="w-40 text-right font-medium">{c.yearN - 1}</th>
+                                    {years.map(y => <th key={y.year} className={`${colW} text-right font-medium`}>{y.year}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
                                 {BALANCE_SECTIONS.map(s => (
                                     <React.Fragment key={s.id}>
                                         {s.id === 'pn' && (
-                                            <tr><td colSpan={3} className="pt-6 pb-1 text-xs uppercase tracking-wider text-indigo-300">Patrimonio neto y pasivo</td></tr>
+                                            <tr><td colSpan={years.length + 1} className="pt-6 pb-1 text-xs uppercase tracking-wider text-indigo-300">Patrimonio neto y pasivo</td></tr>
                                         )}
                                         {s.id === 'anc' && (
-                                            <tr><td colSpan={3} className="pt-2 pb-1 text-xs uppercase tracking-wider text-indigo-300">Activo</td></tr>
+                                            <tr><td colSpan={years.length + 1} className="pt-2 pb-1 text-xs uppercase tracking-wider text-indigo-300">Activo</td></tr>
                                         )}
                                         <tr className="border-t border-slate-700 bg-slate-800/60">
                                             <td className="py-2 font-semibold text-slate-200">{s.label}</td>
-                                            <td className="text-right font-semibold tabular-nums">{eur(totalFor(figN, s.id))}</td>
-                                            <td className="text-right font-semibold tabular-nums">{eur(totalFor(figN1, s.id))}</td>
+                                            {figs.map((f, i) => <td key={i} className="text-right font-semibold tabular-nums">{eur(totalFor(f, s.id))}</td>)}
                                         </tr>
                                         {BALANCE_LINES.filter(l => l.section === s.id).map(l => (
                                             <tr key={l.id} className="border-t border-slate-800">
                                                 <td className="py-1 pr-2 text-slate-300" title={l.hint}>{l.label}{l.hint && <span className="text-slate-500"> ⓘ</span>}</td>
-                                                <td className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${c.yearN}`} value={data.yearN[l.id] ?? 0} onChange={v => setValue('yearN', l.id, v)} /></td>
-                                                <td className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${c.yearN - 1}`} value={data.yearN1[l.id] ?? 0} onChange={v => setValue('yearN1', l.id, v)} /></td>
+                                                {years.map((y, i) => (
+                                                    <td key={y.year} className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${y.year}`} value={y.values[l.id] ?? 0} onChange={v => setValue(i, l.id, v)} /></td>
+                                                ))}
                                             </tr>
                                         ))}
                                     </React.Fragment>
@@ -116,8 +134,7 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                         </table>
                     </div>
                     <div className="grid md:grid-cols-2 gap-2">
-                        <BalanceCheck fig={figN} year={c.yearN} />
-                        <BalanceCheck fig={figN1} year={c.yearN - 1} />
+                        {figs.map((f, i) => <BalanceCheck key={i} fig={f} year={years[i].year} />)}
                     </div>
                 </CardContent>
             </Card>
@@ -131,8 +148,7 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                             <thead>
                                 <tr className="text-slate-400">
                                     <th className="text-left font-medium py-2">Partida</th>
-                                    <th className="w-40 text-right font-medium">{c.yearN}</th>
-                                    <th className="w-40 text-right font-medium">{c.yearN - 1}</th>
+                                    {years.map(y => <th key={y.year} className={`${colW} text-right font-medium`}>{y.year}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
@@ -141,28 +157,26 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                                         {l.id === 'ingresosFin' && (
                                             <tr className="border-t border-slate-700 bg-slate-800/60">
                                                 <td className="py-2 font-semibold">A.1) Resultado de explotación</td>
-                                                <td className="text-right font-semibold tabular-nums">{eur(figN.ebit)}</td>
-                                                <td className="text-right font-semibold tabular-nums">{eur(figN1.ebit)}</td>
+                                                {figs.map((f, i) => <td key={i} className="text-right font-semibold tabular-nums">{eur(f.ebit)}</td>)}
                                             </tr>
                                         )}
                                         {l.id === 'impuesto' && (
                                             <tr className="border-t border-slate-700 bg-slate-800/60">
                                                 <td className="py-2 font-semibold">A.3) Resultado antes de impuestos</td>
-                                                <td className="text-right font-semibold tabular-nums">{eur(figN.rai)}</td>
-                                                <td className="text-right font-semibold tabular-nums">{eur(figN1.rai)}</td>
+                                                {figs.map((f, i) => <td key={i} className="text-right font-semibold tabular-nums">{eur(f.rai)}</td>)}
                                             </tr>
                                         )}
                                         <tr className="border-t border-slate-800">
                                             <td className="py-1 pr-2 text-slate-300" title={l.hint}>{l.label}{l.hint && <span className="text-slate-500"> ⓘ</span>}</td>
-                                            <td className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${c.yearN}`} value={data.yearN[l.id] ?? 0} onChange={v => setValue('yearN', l.id, v)} /></td>
-                                            <td className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${c.yearN - 1}`} value={data.yearN1[l.id] ?? 0} onChange={v => setValue('yearN1', l.id, v)} /></td>
+                                            {years.map((y, i) => (
+                                                <td key={y.year} className="py-1 pl-2"><AmountInput ariaLabel={`${l.label} ${y.year}`} value={y.values[l.id] ?? 0} onChange={v => setValue(i, l.id, v)} /></td>
+                                            ))}
                                         </tr>
                                     </React.Fragment>
                                 ))}
                                 <tr className="border-t border-slate-700 bg-slate-800/60">
                                     <td className="py-2 font-bold">A.5) Resultado del ejercicio</td>
-                                    <td className="text-right font-bold tabular-nums">{eur(figN.resultado)}</td>
-                                    <td className="text-right font-bold tabular-nums">{eur(figN1.resultado)}</td>
+                                    {figs.map((f, i) => <td key={i} className="text-right font-bold tabular-nums">{eur(f.resultado)}</td>)}
                                 </tr>
                             </tbody>
                         </table>
@@ -182,10 +196,10 @@ export const DataEntry: React.FC<Props> = ({ data, onChange }) => {
                     <Field label="Plazo de pago pactado (días)">
                         <AmountInput allowEmpty value={c.agreedPaymentDays} onChange={v => setCompany({ agreedPaymentDays: v })} placeholder="—" />
                     </Field>
-                    <Field label="Disponible en pólizas de crédito (€)" hint="Importe no dispuesto de pólizas y líneas de circulante al cierre.">
+                    <Field label="Disponible en pólizas de crédito (€)" hint="Importe no dispuesto al cierre. No hace falta si detalla las pólizas en el cuadro de financiación.">
                         <AmountInput allowEmpty value={c.creditLinesLimit} onChange={v => setCompany({ creditLinesLimit: v })} placeholder="—" />
                     </Field>
-                    <Field label="Cuotas de principal a pagar en N+1 (€)" hint="Si se deja vacío se usa la deuda bancaria y leasing a corto plazo.">
+                    <Field label="Cuotas de principal a pagar en N+1 (€)" hint="No hace falta si detalla los préstamos en el cuadro de financiación. Si todo queda vacío se usa la deuda bancaria y leasing a corto.">
                         <AmountInput allowEmpty value={c.nextYearDebtService} onChange={v => setCompany({ nextYearDebtService: v })} placeholder="—" />
                     </Field>
                     <Field label="Objetivo máximo DFN / EBITDA" hint="Nivel de deuda aceptable. Habitual: 2,5x - 3,5x.">

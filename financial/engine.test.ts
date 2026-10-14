@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { analyze, simulate, NO_LEVERS } from './engine';
 import { sampleDataset } from './sampleData';
-import { parseImport, buildTemplateCsv } from './importer';
+import { parseImport, parseDebts, buildTemplateCsv } from './importer';
 import { parseAmount } from './format';
-import { emptyDataset } from './schema';
+import { emptyDataset, migrateDataset } from './schema';
 
 describe('analyze (empresa de ejemplo)', () => {
     const a = analyze(sampleDataset());
@@ -57,7 +57,7 @@ describe('analyze (empresa de ejemplo)', () => {
 describe('comprobaciones mercantiles', () => {
     it('avisa de causa de disolución si el PN < 50 % del capital', () => {
         const ds = emptyDataset();
-        Object.assign(ds.yearN, { capital: 100_000, rdosAnteriores: -70_000, efectivo: 30_000 });
+        Object.assign(ds.years[0].values, { capital: 100_000, rdosAnteriores: -70_000, efectivo: 30_000 });
         const a = analyze(ds);
         expect(a.checks.some(c => c.title.includes('disolución'))).toBe(true);
     });
@@ -77,9 +77,11 @@ describe('importador', () => {
 
     it('reimporta la plantilla CSV', () => {
         const ds = sampleDataset();
-        const res = parseImport(buildTemplateCsv(ds.yearN, ds.yearN1));
-        expect(res.yearN.ventas).toBe(4_500_000);
-        expect(res.yearN1.otrosAcreedores).toBe(128_500);
+        const res = parseImport(buildTemplateCsv(ds.years));
+        expect(res.years).toEqual(ds.years.map(y => y.year));
+        expect(res.columns[0].ventas).toBe(4_500_000);
+        expect(res.columns[1].otrosAcreedores).toBe(128_500);
+        expect(res.columns[2].reservas).toBe(563_750);
     });
 
     it('interpreta un balance pegado de las cuentas anuales', () => {
@@ -99,13 +101,90 @@ describe('importador', () => {
             '4. Aprovisionamientos\t\t(3.240.000)\t(2.940.000)',
         ].join('\n');
         const res = parseImport(text);
-        expect(res.yearN.inmMaterial).toBe(1_035_000);
-        expect(res.yearN.clientes).toBe(800_000);
-        expect(res.yearN.otrosDeudores).toBe(45_000);
-        expect(res.yearN.deudaBancariaLP).toBe(600_000);
-        expect(res.yearN.deudaBancariaCP).toBe(520_000);
-        expect(res.yearN1.deudaBancariaCP).toBe(280_000);
-        expect(res.yearN.ventas).toBe(4_500_000);
-        expect(res.yearN.aprovisionamientos).toBe(-3_240_000);
+        expect(res.columns[0].inmMaterial).toBe(1_035_000);
+        expect(res.columns[0].clientes).toBe(800_000);
+        expect(res.columns[0].otrosDeudores).toBe(45_000);
+        expect(res.columns[0].deudaBancariaLP).toBe(600_000);
+        expect(res.columns[0].deudaBancariaCP).toBe(520_000);
+        expect(res.columns[1].deudaBancariaCP).toBe(280_000);
+        expect(res.columns[0].ventas).toBe(4_500_000);
+        expect(res.columns[0].aprovisionamientos).toBe(-3_240_000);
+    });
+});
+
+describe('histórico de varios ejercicios', () => {
+    const a = analyze(sampleDataset());
+
+    it('calcula los tres ejercicios y concilia cada estado de flujos', () => {
+        expect(a.history).toHaveLength(3);
+        expect(a.history[2].cashFlow).toBeNull();
+        for (const h of a.history.slice(0, 2)) expect(Math.abs(h.cashFlow!.unreconciled)).toBeLessThan(0.01);
+        expect(a.history[1].fig.resultado).toBe(136_500);
+        expect(a.history[2].fig.resultado).toBe(146_250);
+    });
+
+    it('calcula el crecimiento medio anual', () => {
+        expect(a.trends.periods).toBe(2);
+        expect(a.trends.cagrVentas).toBeCloseTo(Math.sqrt(4_500_000 / 3_900_000) - 1, 6);
+        expect(a.findings.some(f => f.area === 'Evolución')).toBe(true);
+    });
+});
+
+describe('cuadro de financiación', () => {
+    const ds = sampleDataset();
+    const a = analyze(ds);
+    const plan = a.debtPlan!;
+
+    it('cuadra con la deuda del balance', () => {
+        expect(plan.reconciliation.detailedDebt).toBe(1_185_000);
+        expect(plan.reconciliation.diff).toBe(0);
+        expect(plan.warnings).toHaveLength(0);
+    });
+
+    it('calcula pólizas, renting y coste medio', () => {
+        expect(plan.creditLimit).toBe(600_000);
+        expect(plan.creditAvailable).toBe(120_000);
+        expect(plan.rentingAnnual).toBe((2400 + 650) * 12);
+        expect(plan.weightedRate).toBeGreaterThan(4);
+        expect(plan.expensiveLines[0].line.item.lender).toBe('Banco B');
+        expect(plan.creditMaturing12m).toHaveLength(1);
+        expect(a.debt.source).toBe('detalle');
+        expect(a.debt.availableCreditLines).toBe(120_000);
+    });
+
+    it('amortiza los préstamos según su cuota', () => {
+        const ico = plan.lines.find(l => l.item.description.includes('ICO'))!;
+        const total = ico.principalByYear.reduce((x, y) => x + y, 0);
+        expect(total).toBeCloseTo(380_000, 0);
+        // primer año: 12 cuotas menos intereses
+        expect(ico.principalByYear[0] + ico.interestByYear[0]).toBeCloseTo(7050 * 12, 0);
+    });
+
+    it('lee el cuadro pegado desde Excel', () => {
+        const items = parseDebts('Tipo;Entidad;Descripción;Pendiente;Límite;Tipo;Cuota;Vencimiento;Carencia;Garantía\nLeasing;Banco Z;Carretilla;"12.500,00";;4,75 %;450;06/2028;;\nPóliza de crédito;Banco Y;;50000;100000;5;;2026-03;;Personal');
+        expect(items).toHaveLength(2);
+        expect(items[0]).toMatchObject({ type: 'leasing', outstanding: 12_500, rate: 4.75, monthlyPayment: 450, maturity: '2028-06' });
+        expect(items[1]).toMatchObject({ type: 'poliza', limit: 100_000, maturity: '2026-03' });
+    });
+});
+
+describe('compatibilidad', () => {
+    it('migra clientes guardados con la versión de dos ejercicios', () => {
+        const old = { version: 1, company: { name: 'X', yearN: 2024, employeesN: 5, employeesN1: 4, sector: 'comercio' }, yearN: { ventas: 100 }, yearN1: { ventas: 90 } };
+        const ds = migrateDataset(old);
+        expect(ds.years.map(y => y.year)).toEqual([2024, 2023]);
+        expect(ds.years[0].values.ventas).toBe(100);
+        expect(ds.years[1].employees).toBe(4);
+        expect(ds.company.sector).toBe('comercio');
+        expect(ds.debts).toEqual([]);
+    });
+
+    it('importa varias columnas ignorando la columna de notas', () => {
+        const text = 'PASIVO CORRIENTE\tNotas\t2025\t2024\t2023\n2. Deudas con entidades de crédito\t9\t520.000\t280.000\t200.000\nProveedores\t9\t480.000\t\t390.000';
+        const res = parseImport(text);
+        expect(res.years).toEqual([2025, 2024, 2023]);
+        expect(res.columns[2].deudaBancariaCP).toBe(200_000);
+        expect(res.columns[1].proveedores).toBeUndefined();
+        expect(res.columns[2].proveedores).toBe(390_000);
     });
 });

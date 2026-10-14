@@ -4,8 +4,10 @@
 
 import {
     BALANCE_LINES, PYG_LINES,
+    emptyYear,
     type BalanceSection, type CompanyInfo, type FinancialDataset, type Sector, type YearValues,
 } from './schema';
+import { buildDebtPlan, type DebtPlan } from './debt';
 import { eur, pct, times, days, signedPct, isNum, type ValueFormat } from './format';
 
 // ---------------------------------------------------------------------------
@@ -13,6 +15,15 @@ import { eur, pct, times, days, signedPct, isNum, type ValueFormat } from './for
 // ---------------------------------------------------------------------------
 
 export type Status = 'good' | 'warn' | 'bad' | 'neutral';
+
+/** Datos de la empresa con los del ejercicio analizado (N) y el anterior (N-1). */
+export interface AnalysisCompany extends CompanyInfo {
+    yearN: number;
+    employeesN: number | null;
+    employeesN1: number | null;
+    /** Todos los ejercicios disponibles, del más reciente al más antiguo. */
+    years: number[];
+}
 
 export interface YearFigures {
     lines: YearValues; // valores normalizados (signos coherentes)
@@ -115,8 +126,29 @@ export interface RowComparison {
     level: 0 | 1 | 2; // 0 = total, 1 = subtotal, 2 = partida
 }
 
+export interface HistoryYear {
+    year: number;
+    fig: YearFigures;
+    ratios: Record<string, number | null>;
+    /** Flujos del ejercicio (requiere el balance del año anterior). */
+    cashFlow: CashFlow | null;
+    altmanZ: number;
+}
+
+export interface Trends {
+    periods: number;               // nº de años entre el primero y el último
+    cagrVentas: number | null;
+    cagrEbitda: number | null;
+    cumulativeOperatingCash: number;
+    cumulativeFreeCash: number;
+    cumulativeDividends: number;
+}
+
 export interface Analysis {
-    company: CompanyInfo;
+    company: AnalysisCompany;
+    history: HistoryYear[];
+    trends: Trends;
+    debtPlan: DebtPlan | null;
     n: YearFigures;
     n1: YearFigures;
     balanceRows: RowComparison[];
@@ -132,8 +164,12 @@ export interface Analysis {
         yearsToRepay: number | null;
         dscr: number | null;
         debtServiceUsed: number;
+        interestUsed: number;
         availableCreditLines: number | null;
         shortTermShare: number | null;
+        /** Deuda financiera neta + cuotas pendientes de renting (visión de las entidades financieras). */
+        adjustedDfn: number | null;
+        source: 'detalle' | 'manual' | 'balance';
     };
     checks: Check[];
     findings: Finding[];
@@ -331,7 +367,7 @@ function comparisonRows(n: YearFigures, n1: YearFigures): { balance: RowComparis
 // Ratios
 // ---------------------------------------------------------------------------
 
-function computeRatios(n: YearFigures, n1: YearFigures, c: CompanyInfo): Ratio[] {
+function computeRatios(n: YearFigures, n1: YearFigures, c: AnalysisCompany): Ratio[] {
     const bm = SECTOR_BENCHMARKS[c.sector];
     const iva = 1 + Math.max(c.vatRate, 0) / 100;
     const ratios: Ratio[] = [];
@@ -376,7 +412,7 @@ function computeRatios(n: YearFigures, n1: YearFigures, c: CompanyInfo): Ratio[]
     add('cobertura', 'Solvencia y endeudamiento', 'Cobertura de intereses (EBITDA / gastos financieros)', 'x', y => (y.gastosFinancieros > 0 ? y.ebitda / y.gastosFinancieros : null), { good: 6, bad: 3, higherIsBetter: true },
         'Veces que el EBITDA cubre la carga financiera.');
     add('costeDeuda', 'Solvencia y endeudamiento', 'Coste medio de la deuda financiera', 'pct', (y, o, isN) => {
-        const base = isN ? avg(y.deudaFin, o.deudaFin) : y.deudaFin;
+        const base = isN && o.activo !== 0 ? avg(y.deudaFin, o.deudaFin) : y.deudaFin;
         return base > 0 ? y.gastosFinancieros / base : null;
     }, { good: 0.045, bad: 0.075, higherIsBetter: false },
         'Gastos financieros sobre la deuda financiera media (incluye comisiones y descuento).');
@@ -544,7 +580,7 @@ function computeAltman(y: YearFigures, sector: Sector): AltmanResult {
     };
 }
 
-function computeBreakEven(y: YearFigures, c: CompanyInfo): BreakEven {
+function computeBreakEven(y: YearFigures, c: AnalysisCompany): BreakEven {
     const L = (id: string) => val(y.lines, id);
     const pPers = Math.min(Math.max(c.variablePersonalPct, 0), 100) / 100;
     const pOtros = Math.min(Math.max(c.variableOtherOpexPct, 0), 100) / 100;
@@ -567,7 +603,7 @@ function computeBreakEven(y: YearFigures, c: CompanyInfo): BreakEven {
 // Comprobaciones contables y mercantiles
 // ---------------------------------------------------------------------------
 
-function computeChecks(n: YearFigures, n1: YearFigures, c: CompanyInfo, rawN: YearValues, rawN1: YearValues): Check[] {
+function computeChecks(n: YearFigures, n1: YearFigures, c: AnalysisCompany, rawN: YearValues, rawN1: YearValues): Check[] {
     const checks: Check[] = [];
     const tol = (a: number) => Math.max(5, Math.abs(a) * 0.0005);
     ([['N', n, c.yearN], ['N-1', n1, c.yearN - 1]] as const).forEach(([tag, y, year]) => {
@@ -740,7 +776,7 @@ function buildDiagnosis(a: Omit<Analysis, 'findings' | 'recommendations' | 'ques
         F({ area: 'Endeudamiento', tone: 'negative', severity: cob < 1.5 ? 'critical' : 'warning', title: `Cobertura de intereses de solo ${times(cob)}`, detail: 'Una parte muy relevante del EBITDA se va en pagar intereses.' });
     }
     if (isNum(a.debt.dscr) && a.debt.dscr < 1.2 && a.debt.debtServiceUsed > 0) {
-        F({ area: 'Endeudamiento', tone: 'negative', severity: a.debt.dscr < 1 ? 'critical' : 'warning', title: `Cobertura del servicio de la deuda de ${times(a.debt.dscr)}`, detail: `La caja operativa (EBITDA − impuestos) no cubre con holgura las cuotas de principal e intereses previstas (${eur(a.debt.debtServiceUsed + n.gastosFinancieros)}).${c.nextYearDebtService === null ? ' Se ha tomado como principal toda la deuda bancaria y leasing a corto plazo, incluidas pólizas que normalmente se renuevan: indique las cuotas reales en la información complementaria para afinar este cálculo.' : ''}` });
+        F({ area: 'Endeudamiento', tone: 'negative', severity: a.debt.dscr < 1 ? 'critical' : 'warning', title: `Cobertura del servicio de la deuda de ${times(a.debt.dscr)}`, detail: `La caja operativa (EBITDA − impuestos) no cubre con holgura las cuotas de principal e intereses previstas (${eur(a.debt.debtServiceUsed + a.debt.interestUsed)}).${a.debt.source === 'balance' ? ' Se ha tomado como principal toda la deuda bancaria y leasing a corto plazo, incluidas pólizas que normalmente se renuevan: detalle los préstamos en el cuadro de financiación para afinar este cálculo.' : a.debt.source === 'detalle' ? ' Calculado con el calendario real de cuotas del cuadro de financiación (sin pólizas, que se renuevan).' : ''}` });
         if (!(n.fm < 0 && n.nof > 0)) {
             R({ priority: a.debt.dscr < 1 ? 'Alta' : 'Media', area: 'Financiación', title: 'Alargar plazos o pedir carencia en los préstamos', detail: 'Negociar con las entidades la ampliación del plazo de amortización o una carencia de principal para adecuar las cuotas a la generación de caja.', impact: `Servicio de la deuda considerado: ${eur(a.debt.debtServiceUsed)} de principal.`, horizon: 'Inmediato' });
         }
@@ -749,6 +785,71 @@ function buildDiagnosis(a: Omit<Analysis, 'findings' | 'recommendations' | 'ques
         const end = rv('endeudamiento');
         if (isNum(end) && end > 0.7) {
             R({ priority: 'Media', area: 'Estructura de capital', title: 'Reforzar los fondos propios', detail: 'Retener beneficios (no repartir dividendos), capitalizar préstamos de socios o realizar aportaciones. Mejora el rating bancario y permite aplicar la reserva de capitalización (art. 25 LIS).', impact: `Para bajar el endeudamiento al 60 % se necesitarían ${eur(n.pasivo - 0.6 * n.activo)} más de fondos propios (o menos deuda).`, horizon: 'Medio plazo (6-18 meses)' });
+        }
+    }
+
+    // --- Cuadro de financiación (detalle de préstamos, leasing, renting y pólizas)
+    const plan = a.debtPlan;
+    if (plan) {
+        for (const w of plan.warnings) F({ area: 'Financiación', tone: 'neutral', severity: 'warning', title: 'Revisar el cuadro de financiación', detail: w });
+        if (isNum(plan.weightedRate)) {
+            F({ area: 'Financiación', tone: 'neutral', severity: 'info', title: `Coste medio ponderado de la deuda: ${plan.weightedRate.toFixed(2).replace('.', ',')} %`, detail: `Sobre ${eur(plan.outstanding)} de financiación con coste. Servicio de la deuda previsto en ${c.yearN + 1}: ${eur(plan.principalNext12)} de principal y ${eur(plan.interestNext12)} de intereses.` });
+        }
+        if (plan.expensiveLines.length) {
+            const top = plan.expensiveLines.slice(0, 3);
+            R({ priority: 'Media', area: 'Financiación', title: 'Cancelar o refinanciar primero la deuda más cara', detail: `Operaciones con un tipo claramente superior a la media (${pct((plan.weightedRate ?? 0) / 100)}): ${top.map(e => `${e.line.typeLabel} ${e.line.item.lender || ''} (${e.line.item.rate?.toString().replace('.', ',')} %, ${eur(e.line.item.outstanding)})`.replace(/\s+\(/, ' (')).join('; ')}. Destinar a ellas los excedentes de tesorería o pedir su subrogación/refinanciación a otra entidad, comprobando antes las comisiones de amortización anticipada.`, impact: `Igualarlas al coste medio ahorraría unos ${eur(plan.expensiveLines.reduce((x, e) => x + e.saving, 0))} anuales en intereses.`, horizon: 'Corto plazo (0-6 meses)' });
+        }
+        if (plan.creditMaturing12m.length) {
+            const lim = plan.creditMaturing12m.reduce((x, l) => x + (l.item.limit ?? l.item.outstanding), 0);
+            F({ area: 'Financiación', tone: 'negative', severity: 'warning', title: `Pólizas y líneas que vencen en los próximos 12 meses (${eur(lim)} de límite)`, detail: plan.creditMaturing12m.map(l => `${l.item.lender || l.typeLabel}: vence ${l.item.maturity}, dispuesto ${eur(l.item.outstanding)}`).join(' · ') });
+            R({ priority: 'Alta', area: 'Financiación', title: 'Renovar con antelación las pólizas que vencen este año', detail: 'Iniciar la renovación al menos 3 meses antes del vencimiento, con las cuentas cerradas y el presupuesto de tesorería, y negociar a la vez límites, tipos y la eliminación de avales personales. Si la renovación no es segura, transformar parte del dispuesto en un préstamo a largo plazo.', impact: `Límite a renovar: ${eur(lim)}.`, horizon: 'Inmediato' });
+        }
+        if (plan.tightYears.length) {
+            const worst = plan.tightYears.reduce((x, y) => ((y.dscr ?? 9) < (x.dscr ?? 9) ? y : x));
+            F({ area: 'Financiación', tone: 'negative', severity: (worst.dscr ?? 0) < 1 ? 'critical' : 'warning', title: `El calendario de cuotas supera la capacidad de pago en ${plan.tightYears.map(y => y.label).join(', ')}`, detail: `En ${worst.label} las cuotas (${eur(worst.debtService)}) equivalen a ${times(worst.dscr ? 1 / worst.dscr : null)} la caja operativa anual estimada (${eur(worst.capacity)}).` });
+            if (!recs.some(r => r.title.startsWith('Alargar plazos'))) {
+                R({ priority: (worst.dscr ?? 0) < 1 ? 'Alta' : 'Media', area: 'Financiación', title: 'Alargar plazos o pedir carencia en los préstamos', detail: `Reordenar el calendario de vencimientos para que ningún año las cuotas superen el 80 % de la caja operativa. Años en tensión: ${plan.tightYears.map(y => `${y.label} (${eur(y.debtService)})`).join(', ')}.`, impact: `Exceso de cuotas sobre la capacidad en ${worst.label}: ${eur(Math.max(0, worst.debtService - worst.capacity / 1.2))}.`, horizon: 'Inmediato' });
+            }
+        }
+        if (plan.balloons.length) {
+            F({ area: 'Financiación', tone: 'neutral', severity: 'warning', title: 'Pagos finales elevados al vencimiento', detail: plan.balloons.map(l => `${l.item.lender || l.typeLabel} (${l.item.maturity}): ${eur(l.balloon)}`).join(' · ') + '. Hay que planificar su refinanciación o el ahorro necesario.' });
+        }
+        if (plan.personalGuarantees.length) {
+            const tot = plan.personalGuarantees.reduce((x, l) => x + Math.max(l.item.outstanding, l.item.limit ?? 0), 0);
+            R({ priority: 'Baja', area: 'Financiación', title: 'Negociar la liberación de avales personales de los socios', detail: `Hay ${plan.personalGuarantees.length} operaciones con garantía personal (${eur(tot)}). Con la solvencia actual, plantear en las próximas renovaciones su sustitución por garantía ICO/SGR o su eliminación.`, impact: null, horizon: 'Medio plazo (6-18 meses)' });
+        }
+        if (plan.rentingPending > 0) {
+            F({ area: 'Financiación', tone: 'neutral', severity: 'info', title: `Compromisos de renting fuera de balance: ${eur(plan.rentingPending)}`, detail: `Cuotas anuales de ${eur(plan.rentingAnnual)} (ya incluidas en el EBITDA como gasto). Sumando lo pendiente a la deuda neta, la deuda ajustada sería ${eur(a.debt.adjustedDfn)}${n.ebitda + plan.rentingAnnual > 0 ? ` (${times((a.debt.adjustedDfn ?? 0) / (n.ebitda + plan.rentingAnnual))} el EBITDA antes de renting)` : ''}.` });
+            if (plan.rentingAnnual > 0.05 * Math.max(n.ebitda, 1) && plan.rentingAnnual > 6000) {
+                R({ priority: 'Baja', area: 'Financiación', title: 'Comparar el coste del renting con la compra financiada', detail: 'Para los rentings de mayor importe, comparar el coste total (cuotas + penalizaciones) con la compra mediante préstamo o leasing, teniendo en cuenta la deducibilidad fiscal y la flexibilidad de cada opción.', impact: `Cuotas de renting previstas en ${c.yearN + 1}: ${eur(plan.rentingAnnual)}.`, horizon: 'Medio plazo (6-18 meses)' });
+            }
+        }
+    }
+
+    // --- Evolución plurianual (3 o más ejercicios)
+    const hist = a.history; // del más reciente al más antiguo
+    if (hist.length >= 3) {
+        const chrono = [...hist].reverse();
+        const series = (id: string) => chrono.map(h => h.ratios[id]).filter(isNum);
+        const monotone = (xs: number[], dir: 1 | -1) => xs.length >= 3 && xs.every((x, i) => i === 0 || (x - xs[i - 1]) * dir > 0);
+        const span = `${chrono[0].year}-${chrono[chrono.length - 1].year}`;
+        const t = a.trends;
+        if (isNum(t.cagrVentas)) {
+            F({ area: 'Evolución', tone: t.cagrVentas >= 0.03 ? 'positive' : t.cagrVentas < 0 ? 'negative' : 'neutral', severity: t.cagrVentas >= 0.03 ? 'positive' : t.cagrVentas < 0 ? 'warning' : 'info', title: `Ventas ${span}: crecimiento medio anual del ${pct(t.cagrVentas)}`, detail: `De ${eur(chrono[0].fig.ventas)} a ${eur(chrono[chrono.length - 1].fig.ventas)}.${isNum(t.cagrEbitda) ? ` El EBITDA crece a un ${pct(t.cagrEbitda)} anual.` : ''}` });
+        }
+        const me = series('margenEbitda');
+        if (monotone(me, -1)) F({ area: 'Evolución', tone: 'negative', severity: 'warning', title: `El margen EBITDA cae de forma continuada desde ${chrono[0].year}`, detail: `${me.map(x => pct(x)).join(' → ')}. No es un hecho puntual: hay un deterioro estructural de la rentabilidad.` });
+        else if (monotone(me, 1)) F({ area: 'Evolución', tone: 'positive', severity: 'positive', title: `El margen EBITDA mejora cada año desde ${chrono[0].year}`, detail: me.map(x => pct(x)).join(' → ') });
+        const pmcS = series('pmc');
+        if (monotone(pmcS, 1)) F({ area: 'Evolución', tone: 'negative', severity: 'warning', title: 'El periodo de cobro empeora año tras año', detail: `${pmcS.map(x => days(x)).join(' → ')}. Revisar la política de crédito a clientes.` });
+        const lev = series('dfnEbitda');
+        if (monotone(lev, 1)) F({ area: 'Evolución', tone: 'negative', severity: 'warning', title: 'El endeudamiento sobre EBITDA aumenta cada año', detail: lev.map(x => times(x)).join(' → ') });
+        const losses = hist.filter(h => h.fig.resultado < 0).length;
+        if (losses >= 2) F({ area: 'Evolución', tone: 'negative', severity: 'critical', title: `Pérdidas en ${losses} de los últimos ${hist.length} ejercicios`, detail: 'Las pérdidas recurrentes erosionan el patrimonio neto: vigilar el equilibrio patrimonial (art. 363 LSC).' });
+        if (t.cumulativeFreeCash < 0) {
+            F({ area: 'Evolución', tone: 'negative', severity: 'warning', title: `Flujo de caja libre acumulado negativo (${eur(t.cumulativeFreeCash)})`, detail: `En el periodo, la explotación generó ${eur(t.cumulativeOperatingCash)} y se repartieron unos ${eur(t.cumulativeDividends)} a los socios: el crecimiento y los dividendos se han financiado con deuda o caja acumulada.` });
+        } else {
+            F({ area: 'Evolución', tone: 'positive', severity: 'positive', title: `Flujo de caja libre acumulado positivo (${eur(t.cumulativeFreeCash)})`, detail: `La explotación generó ${eur(t.cumulativeOperatingCash)} en el periodo.` });
         }
     }
 
@@ -805,12 +906,13 @@ function buildDiagnosis(a: Omit<Analysis, 'findings' | 'recommendations' | 'ques
     return { findings, recommendations: recs };
 }
 
-function buildQuestions(n: YearFigures, c: CompanyInfo, cf: CashFlow): string[] {
+function buildQuestions(n: YearFigures, c: AnalysisCompany, cf: CashFlow, hasDebtDetail: boolean): string[] {
     const q: string[] = [];
     const L = (id: string) => val(n.lines, id);
-    if (n.deudaFin > 0) q.push('Detalle del pool bancario: entidad, importe pendiente, tipo de interés, vencimiento, cuota y garantías (personales, hipotecarias, ICO) de cada préstamo y póliza.');
-    if (c.creditLinesLimit === null) q.push('Límites concedidos y disponible de pólizas de crédito, líneas de descuento, confirming y factoring, y su grado de disposición.');
-    if (!c.employeesN) q.push('Plantilla media de los dos ejercicios (para medir productividad y coste por empleado).');
+    if (n.deudaFin > 0 && !hasDebtDetail) q.push('Detalle del pool bancario: entidad, importe pendiente, tipo de interés, vencimiento, cuota y garantías (personales, hipotecarias, ICO) de cada préstamo y póliza.');
+    if (c.creditLinesLimit === null && !hasDebtDetail) q.push('Límites concedidos y disponible de pólizas de crédito, líneas de descuento, confirming y factoring, y su grado de disposición.');
+    if (hasDebtDetail) q.push('Contratos de los préstamos con covenants (ratios mínimos exigidos por el banco), comisiones de amortización anticipada y condiciones de renovación de las pólizas.');
+    if (!c.employeesN) q.push('Plantilla media de cada ejercicio (para medir productividad y coste por empleado).');
     q.push('Presupuesto o previsión del ejercicio en curso (ventas, márgenes, inversiones previstas) y evolución de los meses ya cerrados.');
     q.push('Ventas por cliente: peso de los 5 y 10 principales clientes (riesgo de concentración) y desglose por línea de producto o servicio con su margen.');
     if (L('clientes') > 0) q.push('Antigüedad de la cartera de clientes (vencido a 30, 60, 90 y +90 días) e impagados o clientes en concurso.');
@@ -857,8 +959,16 @@ function buildSummary(a: Omit<Analysis, 'summary'>): string[] {
     const gV = growth(n.ventas, n1.ventas);
     s.push(`${name} cierra ${c.yearN} con una cifra de negocios de ${eur(n.ventas)} (${isNum(gV) ? signedPct(gV) : 'sin comparativo'} respecto a ${c.yearN - 1}), un EBITDA de ${eur(n.ebitda)} (margen ${pct(r('margenEbitda')?.n)}) y un resultado neto de ${eur(n.resultado)} (${eur(n1.resultado)} el año anterior). La valoración global de su situación económico-financiera es: ${a.grade.toUpperCase()} (${a.score}/100).`);
     s.push(`En generación de caja, la explotación aportó ${eur(cf.operatingTotal)}, se invirtieron ${eur(cf.capex)} en inmovilizado y el flujo de caja libre fue de ${eur(cf.freeCashFlow)}. La tesorería ${cf.actualCashChange >= 0 ? 'aumentó' : 'disminuyó'} en ${eur(Math.abs(cf.actualCashChange))}.`);
+    if (a.history.length >= 3 && isNum(a.trends.cagrVentas)) {
+        const first = a.history[a.history.length - 1];
+        s.push(`En el periodo ${first.year}-${c.yearN} las ventas han crecido a un ritmo medio anual del ${pct(a.trends.cagrVentas)}${isNum(a.trends.cagrEbitda) ? ` y el EBITDA del ${pct(a.trends.cagrEbitda)}` : ''}, con un flujo de caja libre acumulado de ${eur(a.trends.cumulativeFreeCash)}.`);
+    }
     const levTxt = n.dfn <= 0 ? `no tiene deuda financiera neta (caja neta de ${eur(-n.dfn)})` : `tiene una deuda financiera neta de ${eur(n.dfn)}${n.ebitda > 0 ? `, equivalente a ${times(n.dfn / n.ebitda)} su EBITDA` : ''}`;
     s.push(`Financieramente, la empresa ${levTxt}. El fondo de maniobra es de ${eur(n.fm)} frente a unas necesidades operativas de fondos de ${eur(n.nof)}, con una liquidez general de ${times(r('liquidez')?.n)} y un endeudamiento del ${pct(r('endeudamiento')?.n)} sobre el activo.`);
+    if (a.debtPlan) {
+        const p = a.debtPlan;
+        s.push(`Según el cuadro de financiación, en ${c.yearN + 1} la empresa deberá atender ${eur(p.principalNext12 + p.interestNext12)} de cuotas de préstamos y leasing (${eur(p.principalNext12)} de principal)${p.rentingAnnual > 0 ? ` y ${eur(p.rentingAnnual)} de renting` : ''}${p.creditLimit > 0 ? `, y dispone de ${eur(p.creditAvailable)} sin utilizar en pólizas y líneas de crédito` : ''}.`);
+    }
     const crit = a.findings.filter(f => f.severity === 'critical' || f.severity === 'warning').slice(0, 3).map(f => lcFirst(f.title));
     const pos = a.findings.filter(f => f.severity === 'positive').slice(0, 3).map(f => lcFirst(f.title));
     if (pos.length) s.push(`Puntos fuertes: ${pos.join('; ')}.`);
@@ -873,14 +983,49 @@ function buildSummary(a: Omit<Analysis, 'summary'>): string[] {
 // ---------------------------------------------------------------------------
 
 export function analyze(ds: FinancialDataset): Analysis {
-    const nn = normalizeYear(ds.yearN);
-    const nn1 = normalizeYear(ds.yearN1);
-    const n = computeFigures(nn.values);
-    const n1 = computeFigures(nn1.values);
-    const c = ds.company;
+    const years = ds.years;
+    const normalized = years.map(y => normalizeYear(y.values));
+    const figs = normalized.map(x => computeFigures(x.values));
+    const emptyFig = computeFigures(normalizeYear(emptyYear()).values);
+    const n = figs[0];
+    const n1 = figs[1] ?? emptyFig;
+    const companyFor = (i: number): AnalysisCompany => ({
+        ...ds.company,
+        yearN: years[i].year,
+        employeesN: years[i].employees,
+        employeesN1: years[i + 1]?.employees ?? null,
+        years: years.map(y => y.year),
+    });
+    const c = companyFor(0);
     const warnings: string[] = [];
-    const fixed = Array.from(new Set([...nn.fixed, ...nn1.fixed]));
+    const fixed = Array.from(new Set(normalized.flatMap(x => x.fixed)));
     if (fixed.length) warnings.push(`Se han tratado como gasto (signo negativo) las partidas introducidas en positivo: ${fixed.join(', ')}.`);
+
+    // Histórico: ratios y flujos de cada ejercicio respecto al anterior
+    const history: HistoryYear[] = figs.map((fig, i) => {
+        const prev = figs[i + 1];
+        const ci = companyFor(i);
+        const rs = computeRatios(fig, prev ?? emptyFig, ci);
+        return {
+            year: years[i].year,
+            fig,
+            ratios: Object.fromEntries(rs.map(r => [r.id, r.n])),
+            cashFlow: prev ? computeCashFlow(fig, prev) : null,
+            altmanZ: computeAltman(fig, c.sector).z,
+        };
+    });
+    const flows = history.map(h => h.cashFlow).filter((x): x is CashFlow => x !== null);
+    const oldest = history[history.length - 1];
+    const periods = history.length - 1;
+    const cagr = (a: number, b: number) => (periods > 0 && a > 0 && b > 0 ? Math.pow(b / a, 1 / periods) - 1 : null);
+    const trends: Trends = {
+        periods,
+        cagrVentas: cagr(oldest.fig.ventas, n.ventas),
+        cagrEbitda: cagr(oldest.fig.ebitda, n.ebitda),
+        cumulativeOperatingCash: flows.reduce((x, f) => x + f.operatingTotal, 0),
+        cumulativeFreeCash: flows.reduce((x, f) => x + f.freeCashFlow, 0),
+        cumulativeDividends: flows.reduce((x, f) => x + f.dividendsEstimate, 0),
+    };
 
     const { balance, pyg } = comparisonRows(n, n1);
     const ratios = computeRatios(n, n1, c);
@@ -888,13 +1033,30 @@ export function analyze(ds: FinancialDataset): Analysis {
     if (Math.abs(cashFlow.unreconciled) > Math.max(5, Math.abs(n.activo) * 0.0005)) {
         warnings.push(`El estado de flujos no concilia con la variación de tesorería por ${eur(cashFlow.unreconciled)}, normalmente porque alguno de los balances no cuadra.`);
     }
-    const principal = c.nextYearDebtService ?? (val(n.lines, 'deudaBancariaCP') + val(n.lines, 'leasingCP'));
     const ebitdaAfterTax = n.ebitda + Math.min(n.impuesto, 0);
+    const debtPlan = buildDebtPlan(ds.debts ?? [], { yearN: c.yearN, capacity: ebitdaAfterTax, balanceDebt: n.deudaFin });
+    const hasLoans = !!debtPlan && debtPlan.lines.some(l => !l.revolving && !l.offBalance);
+
+    let principal: number, interest: number, source: Analysis['debt']['source'];
+    if (hasLoans) {
+        principal = debtPlan!.principalNext12;
+        interest = debtPlan!.interestNext12;
+        source = 'detalle';
+    } else if (c.nextYearDebtService !== null) {
+        principal = c.nextYearDebtService;
+        interest = n.gastosFinancieros;
+        source = 'manual';
+    } else {
+        principal = val(n.lines, 'deudaBancariaCP') + val(n.lines, 'leasingCP');
+        interest = n.gastosFinancieros;
+        source = 'balance';
+    }
     const fcl = cashFlow.freeCashFlow;
-    const checks = computeChecks(n, n1, c, ds.yearN, ds.yearN1);
+    const checks = computeChecks(n, n1, c, years[0].values, years[1]?.values ?? emptyYear());
+    const availableCreditLines = debtPlan && debtPlan.creditLimit > 0 ? debtPlan.creditAvailable : c.creditLinesLimit;
 
     const base = {
-        company: c, n, n1,
+        company: c, history, trends, debtPlan, n, n1,
         balanceRows: balance, pygRows: pyg,
         ratios, cashFlow,
         altman: computeAltman(n, c.sector),
@@ -904,16 +1066,19 @@ export function analyze(ds: FinancialDataset): Analysis {
         debt: {
             capacity: Math.max(0, c.targetLeverage * n.ebitda - n.dfn),
             yearsToRepay: n.dfn <= 0 ? 0 : fcl > 0 ? n.dfn / fcl : null,
-            dscr: principal + n.gastosFinancieros > 0 ? ebitdaAfterTax / (principal + n.gastosFinancieros) : null,
+            dscr: principal + interest > 0 ? ebitdaAfterTax / (principal + interest) : null,
             debtServiceUsed: principal,
-            availableCreditLines: c.creditLinesLimit,
+            interestUsed: interest,
+            availableCreditLines,
             shortTermShare: n.deudaFin > 0 ? n.deudaFinCP / n.deudaFin : null,
+            adjustedDfn: debtPlan && debtPlan.rentingPending > 0 ? n.dfn + debtPlan.rentingPending : null,
+            source,
         },
         checks,
         warnings,
     };
     const { findings, recommendations } = buildDiagnosis(base);
-    const questions = buildQuestions(n, c, cashFlow);
+    const questions = buildQuestions(n, c, cashFlow, !!debtPlan);
     const { score, grade } = buildScore(ratios, checks);
     const withAll = { ...base, findings, recommendations, questions, score, grade };
     return { ...withAll, summary: buildSummary(withAll) };

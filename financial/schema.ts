@@ -139,9 +139,6 @@ export interface CompanyInfo {
     cif: string;
     sector: Sector;
     legalForm: LegalForm;
-    yearN: number;
-    employeesN: number | null;
-    employeesN1: number | null;
     /** Tipo medio de IVA aplicado en ventas y compras (en %), para calcular los periodos de cobro y pago. */
     vatRate: number;
     /** % de los gastos de personal que se considera variable (para el punto muerto). */
@@ -154,32 +151,77 @@ export interface CompanyInfo {
     agreedCollectionDays: number | null;
     /** Plazo medio de pago pactado con proveedores (días), si se conoce. */
     agreedPaymentDays: number | null;
-    /** Importe no dispuesto de pólizas de crédito y líneas de circulante al cierre (liquidez adicional disponible). */
+    /** Importe no dispuesto de pólizas de crédito y líneas de circulante al cierre (liquidez adicional disponible). Si se detallan las pólizas en el cuadro de financiación se calcula desde allí. */
     creditLinesLimit: number | null;
-    /** Cuota anual de amortización de principal de préstamos prevista para N+1 (si no, se usa la deuda bancaria a CP). */
+    /** Cuota anual de amortización de principal prevista para N+1. Si se detallan los préstamos se calcula desde allí; si no, se usa la deuda bancaria a CP. */
     nextYearDebtService: number | null;
     /** Comentarios cualitativos del cliente: hechos relevantes, objetivos, previsiones… */
     notes: string;
 }
 
+/** Un ejercicio cerrado: año, plantilla media e importes de balance y PyG. */
+export interface YearData {
+    year: number;
+    employees: number | null;
+    values: YearValues;
+}
+
+export type DebtType = 'prestamo' | 'hipoteca' | 'leasing' | 'renting' | 'poliza' | 'descuento' | 'socios' | 'aplazamiento' | 'otro';
+
+export const DEBT_TYPES: { id: DebtType; label: string; hint: string }[] = [
+    { id: 'prestamo', label: 'Préstamo', hint: 'Préstamo bancario personal o ICO.' },
+    { id: 'hipoteca', label: 'Préstamo hipotecario', hint: '' },
+    { id: 'leasing', label: 'Leasing', hint: 'Arrendamiento financiero (figura en balance).' },
+    { id: 'renting', label: 'Renting / arrendamiento operativo', hint: 'No figura en balance: la cuota es gasto. Incluya también alquileres con permanencia.' },
+    { id: 'poliza', label: 'Póliza de crédito', hint: 'Indique el límite y el dispuesto al cierre.' },
+    { id: 'descuento', label: 'Línea de descuento / factoring / confirming', hint: 'Indique el límite y el dispuesto al cierre.' },
+    { id: 'socios', label: 'Préstamo de socios', hint: '' },
+    { id: 'aplazamiento', label: 'Aplazamiento Hacienda / Seguridad Social', hint: '' },
+    { id: 'otro', label: 'Otra financiación', hint: '' },
+];
+
+/** Una operación de financiación o compromiso de pago vigente al cierre del último ejercicio. */
+export interface DebtItem {
+    id: string;
+    type: DebtType;
+    lender: string;
+    description: string;
+    /** Capital pendiente (o dispuesto, en pólizas) al cierre del último ejercicio. En renting puede dejarse a 0. */
+    outstanding: number;
+    /** Límite concedido (pólizas y líneas de circulante). */
+    limit: number | null;
+    /** Tipo de interés nominal anual en %. */
+    rate: number | null;
+    /** Cuota mensual (capital + intereses; en renting, cuota sin IVA). */
+    monthlyPayment: number | null;
+    /** Fecha de vencimiento final o de renovación, "AAAA-MM". */
+    maturity: string;
+    /** Fin de la carencia de capital, "AAAA-MM" (opcional). */
+    graceUntil: string;
+    /** Garantías: personal de los socios, hipotecaria, ICO, pignoración… */
+    guarantee: string;
+}
+
+export const MAX_YEARS = 5;
+
 export interface FinancialDataset {
-    version: 1;
+    version: 2;
     company: CompanyInfo;
-    yearN: YearValues;
-    yearN1: YearValues;
+    /** Ejercicios ordenados del más reciente al más antiguo (mínimo 2, máximo 5). */
+    years: YearData[];
+    debts: DebtItem[];
 }
 
 export const emptyYear = (): YearValues =>
     Object.fromEntries(ALL_LINE_IDS.map(id => [id, 0]));
+
+export const emptyYearData = (year: number): YearData => ({ year, employees: null, values: emptyYear() });
 
 export const defaultCompany = (): CompanyInfo => ({
     name: '',
     cif: '',
     sector: 'servicios',
     legalForm: 'SL',
-    yearN: new Date().getFullYear() - 1,
-    employeesN: null,
-    employeesN1: null,
     vatRate: 21,
     variablePersonalPct: 0,
     variableOtherOpexPct: 25,
@@ -191,9 +233,41 @@ export const defaultCompany = (): CompanyInfo => ({
     notes: '',
 });
 
-export const emptyDataset = (): FinancialDataset => ({
-    version: 1,
-    company: defaultCompany(),
-    yearN: emptyYear(),
-    yearN1: emptyYear(),
+export const emptyDataset = (): FinancialDataset => {
+    const last = new Date().getFullYear() - 1;
+    return { version: 2, company: defaultCompany(), years: [emptyYearData(last), emptyYearData(last - 1)], debts: [] };
+};
+
+export const newDebtItem = (): DebtItem => ({
+    id: Math.random().toString(36).slice(2, 10),
+    type: 'prestamo', lender: '', description: '', outstanding: 0, limit: null, rate: null,
+    monthlyPayment: null, maturity: '', graceUntil: '', guarantee: '',
 });
+
+/** Convierte cualquier dataset guardado (incluida la versión 1, de dos ejercicios) al formato actual. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const migrateDataset = (raw: any): FinancialDataset => {
+    const base = emptyDataset();
+    if (!raw || typeof raw !== 'object') return base;
+    const company: CompanyInfo = { ...base.company };
+    for (const k of Object.keys(company) as (keyof CompanyInfo)[]) {
+        if (raw.company && k in raw.company) (company as unknown as Record<string, unknown>)[k] = raw.company[k];
+    }
+    let years: YearData[];
+    if (Array.isArray(raw.years) && raw.years.length) {
+        years = raw.years.slice(0, MAX_YEARS).map((y: Partial<YearData>, i: number) => ({
+            year: typeof y.year === 'number' ? y.year : base.years[0].year - i,
+            employees: typeof y.employees === 'number' ? y.employees : null,
+            values: { ...emptyYear(), ...(y.values ?? {}) },
+        }));
+    } else {
+        const yearN: number = raw.company?.yearN ?? base.years[0].year;
+        years = [
+            { year: yearN, employees: raw.company?.employeesN ?? null, values: { ...emptyYear(), ...(raw.yearN ?? {}) } },
+            { year: yearN - 1, employees: raw.company?.employeesN1 ?? null, values: { ...emptyYear(), ...(raw.yearN1 ?? {}) } },
+        ];
+    }
+    while (years.length < 2) years.push(emptyYearData(years[years.length - 1].year - 1));
+    const debts: DebtItem[] = Array.isArray(raw.debts) ? raw.debts.map((d: Partial<DebtItem>) => ({ ...newDebtItem(), ...d })) : [];
+    return { version: 2, company, years, debts };
+};

@@ -34,7 +34,7 @@ const App: React.FC = () => {
                             Dirección Financiera
                         </h1>
                         <p className="text-lg text-slate-400">
-                            Introduzca el balance y la cuenta de pérdidas y ganancias de dos ejercicios y obtenga el análisis, diagnóstico y plan de acción de un director financiero.
+                            Introduzca el balance y la cuenta de pérdidas y ganancias de 2 a 5 ejercicios, y su cuadro de financiación, y obtenga el análisis, diagnóstico y plan de acción de un director financiero.
                         </p>
                     </header>
                     <FinancialDirector />
