@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculadora Fiscal de Donación de Participaciones</title>
+    <title>Dirección Financiera y Fiscalidad</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       /* Custom scrollbar for a more modern look */
@@ -20,6 +20,21 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #6366f1; /* indigo-500 */
+      }
+
+      /* Informe impreso / PDF en fondo blanco */
+      @media print {
+        @page { margin: 14mm; }
+        html, body, .min-h-screen { background: #fff !important; color: #111 !important; }
+        [class*="bg-"] { background: transparent !important; }
+        [class*="text-slate-"], .text-white { color: #111 !important; }
+        [class*="text-emerald-"] { color: #047857 !important; }
+        [class*="text-amber-"] { color: #b45309 !important; }
+        [class*="text-rose-"] { color: #be123c !important; }
+        [class*="text-indigo-"], [class*="text-sky-"] { color: #3730a3 !important; }
+        [class*="border-slate-"] { border-color: #cbd5e1 !important; }
+        tr, .rounded-lg { break-inside: avoid; }
+        svg rect { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       }
     </style>
 <script type="importmap">

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -10,6 +11,13 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
       },
       plugins: [react()],
+      // prospeccion/ es una app aparte con sus propias dependencias y tests (node:test).
+      test: { exclude: ['**/node_modules/**', 'prospeccion/**'] },
+      build: {
+        // Un único archivo JS: la versión para claude.ai se publica como una sola página.
+        rollupOptions: { output: { inlineDynamicImports: true } },
+        chunkSizeWarningLimit: 4000,
+      },
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
