@@ -23,7 +23,7 @@ Investiga en internet la empresa indicada y reúne todos los datos verificables 
 7. Presencia digital y reputación (web, redes, reseñas).
 8. Sector y principales competidores.
 
-Fuentes recomendadas: boe.es (BORME), librebor.me, infoempresa.com, einforma.com, axesor.es, empresite.eleconomista.es, iberinform.es, datoscif.es, infocif.es, cnmv.es (si cotiza), la web corporativa, LinkedIn, prensa económica y regional. Lee las páginas de ficha de empresa cuando la búsqueda las muestre: suelen contener el CIF, los cargos y las cifras de ventas.
+Fuentes recomendadas: boe.es (BORME), infonif.economia3.com (CIF, matriz y actos recientes), empresite.eleconomista.es, einforma.com, iberinform.es, axesor.es, infoempresa.com, alimarket.es (grupo y sector), librebor.me (si responde), cnmv.es (si cotiza), el aviso legal de la web corporativa, LinkedIn, prensa económica y regional. Lee las páginas de ficha de empresa cuando la búsqueda las muestre; si no se pueden abrir, usa el fragmento del buscador y márcalo como no verificado.
 
 Cuando una fuente oculte el dato (las fichas gratuitas suelen tapar cifras y socios) o no se pueda abrir, busca alternativas antes de darlo por no encontrado:
 - Busca también por la marca, el grupo o la matriz, la denominación anterior y los directivos: la prensa suele hablar del grupo.
@@ -35,9 +35,12 @@ Cuando una fuente oculte el dato (las fichas gratuitas suelen tapar cifras y soc
 Prueba al menos dos alternativas antes de declarar un dato como no encontrado y anota dónde buscaste. Indica cuándo un dato es del grupo y no de la sociedad.
 
 Reglas:
-- Si el nombre es ambiguo (varias sociedades con nombres parecidos), identifica la más probable usando la pista disponible (CIF, provincia) y menciona las alternativas.
+- Si el nombre es ambiguo (varias sociedades con nombres parecidos), identifica la más probable usando la pista disponible (CIF, provincia, sector) y menciona las alternativas con su CIF. Confirma por CIF y domicilio, nunca solo por el nombre; distingue la marca de la sociedad legal.
+- Un CIF sacado de un agregador es probable hasta verlo en el BORME o en el aviso legal de la empresa. Si la provincia de asignación del CIF no coincide con el domicilio actual, puede haber un traslado: compruébalo.
+- Averigua quién decide de verdad: si el administrador es otra sociedad, busca quién está detrás.
 - Distingue claramente lo verificado (con su URL) de lo que deduces. No inventes cifras ni personas.
-- Indica el ejercicio al que corresponde cada dato financiero.
+- Indica el ejercicio al que corresponde cada dato financiero y la fecha de cada noticia; un dato de hace más de dos años es antiguo.
+- Solo información profesional y pública: nada de vida privada, familia, salud ni patrimonio personal.
 
 Termina con unas notas de investigación completas y ordenadas por los apartados anteriores, citando la URL de cada dato.`;
 
@@ -55,6 +58,14 @@ La parte comercial ("ventas") debe estar adaptada a lo que ofrece el usuario y a
 - siguientePaso: el compromiso concreto que hay que pedir al final.
 - emailSeguimiento: email breve para enviar tras la reunión, en español, tono profesional y cercano, con marcadores [entre corchetes] para lo que el usuario deba completar.
 
+- Los riesgos delicados (deudas, litigios, pérdidas, concursos) van en "senales" para el usuario, pero no los uses en ganchos ni preguntas: solo se tratan si el cliente saca el tema.
+
+Además:
+- quienDecide: la persona u órgano que probablemente decide la contratación, con su certeza y la pregunta para confirmarlo en la reunión.
+- datosPendientes: los datos importantes que no se han podido encontrar (como mucho cinco), dónde se buscaron y cómo conseguirlos (preguntarlo en la reunión, pedir un documento, fuente de pago).
+- documentosAPedir: documentos concretos que conviene pedir al cliente (por ejemplo, últimas cuentas anuales aprobadas, impuesto de sociedades, organigrama societario).
+- Marca en el texto como "(probable)" los datos que vengan de prensa, rankings o fichas de agregadores sin confirmar, y di cuándo un dato es del grupo y no de la sociedad.
+
 En "fuentes" incluye las URLs realmente usadas.`;
 
 function describirCif(info: CifInfo): string {
@@ -62,10 +73,20 @@ function describirCif(info: CifInfo): string {
   return `CIF ${info.cif} (válido). Forma jurídica según la letra: ${info.formaJuridica}. Provincia donde se asignó: ${info.provinciaInscripcion ?? 'desconocida'}.`;
 }
 
-async function investigar(consulta: string, cif: CifInfo | null, emitir: Emitir) {
+// El modo exprés reduce búsquedas y esfuerzo para cuando la reunión es inminente.
+const LIMITES = {
+  completo: { busquedas: 15, lecturas: 10, esfuerzo: 'high' },
+  expres: { busquedas: 6, lecturas: 4, esfuerzo: 'medium' },
+} as const;
+
+async function investigar(consulta: string, cif: CifInfo | null, expres: boolean, emitir: Emitir) {
+  const limites = expres ? LIMITES.expres : LIMITES.completo;
   const pista = cif ? `\n\nDatos ya conocidos: ${describirCif(cif)}` : '';
+  const foco = expres
+    ? '\n\nModo exprés: la reunión es inminente. Céntrate en identificación, quién decide, tamaño aproximado y noticias del último año.'
+    : '';
   const messages: Anthropic.Beta.BetaMessageParam[] = [
-    { role: 'user', content: `Empresa a investigar: ${consulta}${pista}` },
+    { role: 'user', content: `Empresa a investigar: ${consulta}${pista}${foco}` },
   ];
   const fuentes = new Map<string, string>();
 
@@ -75,11 +96,11 @@ async function investigar(consulta: string, cif: CifInfo | null, emitir: Emitir)
       max_tokens: 64000,
       betas: [FALLBACK_BETA],
       fallbacks: 'default',
-      output_config: { effort: 'high' },
+      output_config: { effort: limites.esfuerzo },
       system: PROMPT_INVESTIGACION,
       tools: [
-        { type: 'web_search_20260209', name: 'web_search', max_uses: 15, user_location: { type: 'approximate', country: 'ES' } },
-        { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 10 },
+        { type: 'web_search_20260209', name: 'web_search', max_uses: limites.busquedas, user_location: { type: 'approximate', country: 'ES' } },
+        { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: limites.lecturas },
       ],
       messages,
     });
@@ -156,7 +177,7 @@ export async function prepararDossier(peticion: PeticionInvestigacion, emitir: E
   if (cif) emitir({ tipo: 'cif', datos: cif });
 
   emitir({ tipo: 'progreso', mensaje: 'Buscando la empresa en registros públicos, prensa y web…' });
-  const { notas, fuentes } = await investigar(consulta, cif, emitir);
+  const { notas, fuentes } = await investigar(consulta, cif, peticion.expres === true, emitir);
 
   emitir({ tipo: 'progreso', mensaje: 'Redactando el dossier y la estrategia de la reunión…' });
   const dossier = await construirDossier(peticion, notas, fuentes);

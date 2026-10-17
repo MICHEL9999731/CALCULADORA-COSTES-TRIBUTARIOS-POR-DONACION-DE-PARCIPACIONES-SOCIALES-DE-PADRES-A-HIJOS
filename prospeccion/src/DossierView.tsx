@@ -44,12 +44,24 @@ function BotonCopiar({ texto, etiqueta }: { texto: string; etiqueta: string }) {
   );
 }
 
+// Los dossieres guardados antes de añadir estos campos no los traen.
+const pendientesDe = (d: Dossier) => ({
+  quienDecide: d.quienDecide ?? null,
+  datos: d.datosPendientes ?? [],
+  documentos: d.documentosAPedir ?? [],
+});
+
 function resumenTexto(d: Dossier): string {
   const v = d.ventas;
+  const { quienDecide } = pendientesDe(d);
   return [
     `${d.empresa.razonSocial}${d.empresa.cif ? ` (${d.empresa.cif})` : ''}`,
     '',
     d.resumenEjecutivo,
+    ...(quienDecide ? ['', `Quién decide (${quienDecide.certeza}): ${quienDecide.persona}`] : []),
+    '',
+    'Señales:',
+    ...d.senales.map((s) => `${s.tipo === 'oportunidad' ? '▲' : s.tipo === 'riesgo' ? '▼' : '●'} ${s.descripcion}`),
     '',
     'Ganchos de apertura:',
     ...v.ganchosApertura.map((g) => `- ${g}`),
@@ -69,12 +81,14 @@ const NAV: Array<[string, string]> = [
   ['finanzas', 'Finanzas'],
   ['registro', 'BORME'],
   ['noticias', 'Noticias'],
+  ['pendientes', 'Pendientes'],
   ['fuentes', 'Fuentes'],
 ];
 
 export function DossierView({ dossier: d }: { dossier: Dossier }) {
   const e = d.empresa;
   const v = d.ventas;
+  const pendientes = pendientesDe(d);
 
   return (
     <article className="dossier">
@@ -107,6 +121,13 @@ export function DossierView({ dossier: d }: { dossier: Dossier }) {
           <span className={`etiqueta confianza-${d.confianza.nivel}`}>Confianza {d.confianza.nivel}</span>
         </div>
         <p>{d.resumenEjecutivo}</p>
+        {pendientes.quienDecide && (
+          <p className="destacado">
+            <strong>Quién decide</strong> ({pendientes.quienDecide.certeza}): {pendientes.quienDecide.persona}
+            <br />
+            <span className="tenue">Para confirmarlo: «{pendientes.quienDecide.preguntaParaConfirmar}»</span>
+          </p>
+        )}
         {d.senales.length > 0 && (
           <ul className="senales">
             {d.senales.map((s, i) => (
@@ -297,6 +318,28 @@ export function DossierView({ dossier: d }: { dossier: Dossier }) {
             </li>
           ))}
         </ul>
+      </Seccion>
+
+      <Seccion id="pendientes" titulo="Pendientes de confirmar">
+        <Vacio lista={pendientes.datos} texto="No quedan datos importantes por localizar." />
+        {pendientes.datos.length > 0 && (
+          <table>
+            <thead>
+              <tr><th>Dato</th><th>Dónde se buscó</th><th>Cómo conseguirlo</th></tr>
+            </thead>
+            <tbody>
+              {pendientes.datos.map((p, i) => (
+                <tr key={i}><td>{p.dato}</td><td className="tenue">{p.dondeSeBusco}</td><td>{p.comoConseguirlo}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {pendientes.documentos.length > 0 && (
+          <>
+            <h3>Documentos a pedir al cliente</h3>
+            <ul>{pendientes.documentos.map((doc, i) => <li key={i}>{doc}</li>)}</ul>
+          </>
+        )}
       </Seccion>
 
       <Seccion id="fuentes" titulo="Fuentes">

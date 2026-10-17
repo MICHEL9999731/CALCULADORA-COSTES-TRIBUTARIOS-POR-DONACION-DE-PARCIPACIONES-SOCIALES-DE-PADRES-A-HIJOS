@@ -20,6 +20,7 @@ interface Paso {
 export default function App() {
   const [consulta, setConsulta] = useState('');
   const [contexto, setContexto] = useState('');
+  const [expres, setExpres] = useState(false);
   const [oferta, setOferta] = useState(cargarOferta);
   const [verOferta, setVerOferta] = useState(false);
 
@@ -47,7 +48,7 @@ export default function App() {
 
     try {
       await investigar(
-        { consulta: q, miOferta: oferta, contextoReunion: contexto || undefined },
+        { consulta: q, miOferta: oferta, contextoReunion: contexto || undefined, expres },
         (ev) => {
           switch (ev.tipo) {
             case 'cif':
@@ -156,6 +157,10 @@ export default function App() {
             placeholder="Contexto opcional: con quién te reúnes, de dónde viene el contacto, qué te han pedido…"
             aria-label="Contexto de la reunión"
           />
+          <label className="interruptor pequeno">
+            <input type="checkbox" checked={expres} onChange={(e) => setExpres(e.target.checked)} disabled={cargando} />
+            Modo exprés: menos búsquedas, para cuando la reunión es inminente
+          </label>
           <button type="button" className="enlace pequeno" onClick={() => setVerOferta((v) => !v)}>
             {verOferta ? 'Ocultar' : 'Editar'} lo que ofreces (se usa para personalizar la estrategia)
           </button>
@@ -185,7 +190,7 @@ export default function App() {
 
         {(cargando || pasos.length > 0) && !dossier && (
           <section className="tarjeta progreso no-print" aria-live="polite">
-            <h3>{cargando ? 'Investigando… (suele tardar 1-3 minutos)' : 'Registro de la investigación'}</h3>
+            <h3>{cargando ? `Investigando… (suele tardar ${expres ? 'menos de 1 minuto' : '1-3 minutos'})` : 'Registro de la investigación'}</h3>
             {cif && (
               <p className={cif.valido ? 'ok' : 'aviso'}>
                 {cif.cif}: {cif.valido ? `${cif.formaJuridica} · asignado en ${cif.provinciaInscripcion ?? '—'}` : cif.motivo}

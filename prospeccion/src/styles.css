@@ -116,6 +116,8 @@ button.pequeno { padding: 6px 12px; }
 .tenue { color: var(--tenue); }
 
 .oferta { display: flex; flex-direction: column; gap: 6px; }
+.interruptor { display: flex; align-items: center; gap: 8px; color: var(--tenue); cursor: pointer; }
+.interruptor input { width: auto; }
 
 .progreso ol { list-style: none; padding: 0; margin: 0; max-height: 320px; overflow-y: auto; font-size: 0.9rem; }
 .progreso li { padding: 4px 0; border-bottom: 1px dashed var(--borde); overflow-wrap: anywhere; }

@@ -7,7 +7,13 @@ Escribe el **nombre o el CIF** de una empresa española y la app prepara un doss
 - **Personas clave y estructura societaria**: administradores, directivos, socios, grupo y sociedades vinculadas.
 - **Actos del BORME**: nombramientos, ampliaciones de capital, fusiones, cambios de domicilio…
 - **Noticias, presencia digital y competidores**, y señales de oportunidad o riesgo.
+- **Quién decide** la contratación, con su grado de certeza y la pregunta para confirmarlo.
+- **Pendientes**: los datos que no se encontraron (dónde se buscaron y cómo conseguirlos) y los documentos que conviene pedir al cliente.
 - **Estrategia comercial adaptada a lo que vendes**: puntos de dolor con su evidencia, propuesta de valor, frases de apertura, preguntas de descubrimiento, objeciones y respuestas, cómo cerrar, siguiente paso a pedir y email de seguimiento.
+
+El **modo exprés** hace menos búsquedas (unas 6) para cuando la reunión es inminente.
+
+Si una ficha oculta un dato (las gratuitas suelen tapar cifras y socios), la investigación busca alternativas: prensa sectorial, la matriz o el grupo, rankings, ofertas de empleo, registros de ayudas y contratos.
 
 Además puedes copiar una chuleta, imprimir el dossier o guardarlo en PDF, y consultar los dossieres anteriores (se guardan en el navegador).
 
@@ -34,7 +40,7 @@ Otros comandos: `npm test` (tests del validador de CIF) y `npm run typecheck`.
 
 ## Coste y tiempo
 
-Cada investigación tarda entre 1 y 3 minutos y hace hasta 15 búsquedas y 10 lecturas de páginas. El coste lo marcan los tokens del modelo y las búsquedas web de tu cuenta de Anthropic. Para abaratarlo, puedes usar otro modelo con `CLAUDE_MODEL` o bajar `max_uses` en `server/research.ts`.
+Cada investigación tarda entre 1 y 3 minutos y hace hasta 15 búsquedas y 10 lecturas de páginas (6 y 4 en modo exprés). El coste lo marcan los tokens del modelo y las búsquedas web de tu cuenta de Anthropic. Para abaratarlo, puedes usar otro modelo con `CLAUDE_MODEL` o bajar `max_uses` en `server/research.ts`.
 
 ## Limitaciones
 

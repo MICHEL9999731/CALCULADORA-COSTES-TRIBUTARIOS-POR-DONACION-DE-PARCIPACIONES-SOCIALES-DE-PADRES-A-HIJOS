@@ -56,6 +56,11 @@ export const DossierSchema = z.object({
     reputacion: texto,
   }),
   competidores: z.array(z.string()),
+  quienDecide: z.object({
+    persona: z.string(),
+    certeza: z.enum(['confirmado', 'probable', 'desconocido']),
+    preguntaParaConfirmar: z.string(),
+  }),
   senales: z.array(
     z.object({
       tipo: z.enum(['oportunidad', 'riesgo', 'neutral']),
@@ -72,6 +77,10 @@ export const DossierSchema = z.object({
     siguientePaso: z.string(),
     emailSeguimiento: z.object({ asunto: z.string(), cuerpo: z.string() }),
   }),
+  datosPendientes: z.array(
+    z.object({ dato: z.string(), dondeSeBusco: z.string(), comoConseguirlo: z.string() }),
+  ),
+  documentosAPedir: z.array(z.string()),
   fuentes: z.array(z.object({ titulo: z.string(), url: z.string() })),
   confianza: z.object({
     nivel: z.enum(['alta', 'media', 'baja']),
@@ -93,6 +102,8 @@ export interface PeticionInvestigacion {
   consulta: string;
   miOferta: string;
   contextoReunion?: string;
+  /** Investigación rápida: menos búsquedas, para cuando la reunión es inminente. */
+  expres?: boolean;
 }
 
 // Mensajes NDJSON que el servidor envía mientras investiga.

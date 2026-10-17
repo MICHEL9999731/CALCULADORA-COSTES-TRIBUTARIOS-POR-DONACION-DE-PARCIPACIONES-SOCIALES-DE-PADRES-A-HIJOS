@@ -30,6 +30,7 @@ app.post('/api/investigar', async (req, res) => {
         consulta,
         miOferta: typeof cuerpo.miOferta === 'string' && cuerpo.miOferta.trim() ? cuerpo.miOferta.trim() : 'Servicios profesionales a empresas.',
         contextoReunion: typeof cuerpo.contextoReunion === 'string' ? cuerpo.contextoReunion.trim() : undefined,
+        expres: cuerpo.expres === true,
       },
       emitir,
     );
