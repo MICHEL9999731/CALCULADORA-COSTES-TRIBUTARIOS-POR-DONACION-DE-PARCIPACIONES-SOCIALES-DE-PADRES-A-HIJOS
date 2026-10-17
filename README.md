@@ -51,3 +51,7 @@ Estima el coste fiscal (IRPF, ISD) de donar participaciones de padres a hijos en
 - **Mis clientes** guarda cada cliente en el espacio privado del usuario en claude.ai (en local, en el navegador).
 - **Descargar informe** genera un HTML con el informe completo; al abrirlo, Ctrl+P / Cmd+P lo guarda en PDF con fondo blanco.
 - Las plantillas y el archivo `.json` del cliente se descargan con confirmación del usuario.
+
+## Otras apps
+
+- [`prospeccion/`](prospeccion/README.md): prepara reuniones con clientes potenciales a partir del nombre o el CIF de la empresa.
