@@ -1,0 +1,92 @@
+{
+  "_instrucciones": "Importes en euros, con punto decimal y sin separador de miles. Ejercicios del más reciente al más antiguo (2 a 5). Gastos en negativo (si se ponen en positivo se corrigen). Partidas vacías = 0. Sectores: industria, comercio, servicios, construccion, hosteleria, agricultura, tecnologia. Tipos de deuda: prestamo, hipoteca, leasing, renting, poliza, descuento, socios, aplazamiento, otro. Vencimiento AAAA-MM.",
+  "empresa": {
+    "nombre": "",
+    "cif": "",
+    "sector": "servicios",
+    "forma_juridica": "SL",
+    "iva": 21,
+    "participaciones": null,
+    "auditada": false
+  },
+  "ejercicios": [
+    {
+      "año": 2025,
+      "empleados": null,
+      "balance": {
+        "inmovilizado_intangible": 0,
+        "inmovilizado_material": 0,
+        "inversiones_inmobiliarias": 0,
+        "inversiones_grupo_lp": 0,
+        "inversiones_financieras_lp": 0,
+        "activos_impuesto_diferido": 0,
+        "otros_activos_no_corrientes": 0,
+        "activos_mantenidos_venta": 0,
+        "existencias": 0,
+        "clientes": 0,
+        "otros_deudores": 0,
+        "inversiones_grupo_cp": 0,
+        "inversiones_financieras_cp": 0,
+        "periodificaciones_activo": 0,
+        "efectivo": 0,
+        "capital": 0,
+        "prima_emision": 0,
+        "reservas": 0,
+        "acciones_propias": 0,
+        "resultados_anteriores": 0,
+        "otras_aportaciones_socios": 0,
+        "resultado_ejercicio": 0,
+        "dividendo_a_cuenta": 0,
+        "ajustes_cambio_valor": 0,
+        "subvenciones": 0,
+        "provisiones_lp": 0,
+        "deudas_bancarias_lp": 0,
+        "leasing_lp": 0,
+        "otras_deudas_lp": 0,
+        "deudas_grupo_lp": 0,
+        "pasivos_impuesto_diferido": 0,
+        "periodificaciones_lp": 0,
+        "pasivos_mantenidos_venta": 0,
+        "provisiones_cp": 0,
+        "deudas_bancarias_cp": 0,
+        "leasing_cp": 0,
+        "otras_deudas_cp": 0,
+        "deudas_grupo_cp": 0,
+        "proveedores": 0,
+        "otros_acreedores": 0,
+        "periodificaciones_pasivo_cp": 0
+      },
+      "pyg": {
+        "ventas": 0,
+        "variacion_existencias": 0,
+        "trabajos_para_activo": 0,
+        "aprovisionamientos": 0,
+        "otros_ingresos_explotacion": 0,
+        "gastos_personal": 0,
+        "otros_gastos_explotacion": 0,
+        "amortizacion": 0,
+        "imputacion_subvenciones": 0,
+        "excesos_provisiones": 0,
+        "deterioro_enajenacion_inmovilizado": 0,
+        "otros_resultados": 0,
+        "ingresos_financieros": 0,
+        "gastos_financieros": 0,
+        "otros_resultados_financieros": 0,
+        "impuesto_beneficios": 0
+      }
+    }
+  ],
+  "deuda": [
+    {
+      "entidad": "",
+      "tipo": "prestamo",
+      "descripcion": "",
+      "pendiente": 0,
+      "limite": null,
+      "tipo_interes": null,
+      "cuota_mensual": null,
+      "vencimiento": "",
+      "garantia": ""
+    }
+  ]
+}

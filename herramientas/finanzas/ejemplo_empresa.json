@@ -1,0 +1,175 @@
+{
+  "empresa": {
+    "nombre": "Distribuciones Ejemplo, S.L. (ficticia)",
+    "cif": "B00000000",
+    "sector": "comercio",
+    "forma_juridica": "SL",
+    "iva": 21,
+    "participaciones": 6000,
+    "auditada": false
+  },
+  "ejercicios": [
+    {
+      "año": 2025,
+      "empleados": 22,
+      "balance": {
+        "inmovilizado_intangible": 35000,
+        "inmovilizado_material": 1035000,
+        "inversiones_financieras_lp": 30000,
+        "existencias": 610000,
+        "clientes": 800000,
+        "otros_deudores": 45000,
+        "periodificaciones_activo": 5000,
+        "efectivo": 40000,
+        "capital": 60000,
+        "reservas": 696500,
+        "resultado_ejercicio": 19500,
+        "deudas_bancarias_lp": 600000,
+        "leasing_lp": 45000,
+        "deudas_bancarias_cp": 520000,
+        "leasing_cp": 20000,
+        "proveedores": 480000,
+        "otros_acreedores": 159000
+      },
+      "pyg": {
+        "ventas": 4500000,
+        "aprovisionamientos": -3240000,
+        "otros_ingresos_explotacion": 25000,
+        "gastos_personal": -700000,
+        "otros_gastos_explotacion": -360000,
+        "amortizacion": -110000,
+        "deterioro_enajenacion_inmovilizado": -5000,
+        "ingresos_financieros": 1000,
+        "gastos_financieros": -85000,
+        "impuesto_beneficios": -6500
+      }
+    },
+    {
+      "año": 2024,
+      "empleados": 20,
+      "balance": {
+        "inmovilizado_intangible": 40000,
+        "inmovilizado_material": 900000,
+        "inversiones_financieras_lp": 30000,
+        "existencias": 480000,
+        "clientes": 620000,
+        "otros_deudores": 40000,
+        "periodificaciones_activo": 5000,
+        "efectivo": 150000,
+        "capital": 60000,
+        "reservas": 640000,
+        "resultado_ejercicio": 136500,
+        "deudas_bancarias_lp": 520000,
+        "leasing_lp": 60000,
+        "deudas_bancarias_cp": 280000,
+        "leasing_cp": 20000,
+        "proveedores": 420000,
+        "otros_acreedores": 128500
+      },
+      "pyg": {
+        "ventas": 4200000,
+        "aprovisionamientos": -2940000,
+        "otros_ingresos_explotacion": 20000,
+        "gastos_personal": -620000,
+        "otros_gastos_explotacion": -330000,
+        "amortizacion": -90000,
+        "ingresos_financieros": 2000,
+        "gastos_financieros": -60000,
+        "impuesto_beneficios": -45500
+      }
+    },
+    {
+      "año": 2023,
+      "empleados": 19,
+      "balance": {
+        "inmovilizado_intangible": 45000,
+        "inmovilizado_material": 865000,
+        "inversiones_financieras_lp": 30000,
+        "existencias": 430000,
+        "clientes": 520000,
+        "otros_deudores": 35000,
+        "periodificaciones_activo": 5000,
+        "efectivo": 210000,
+        "capital": 60000,
+        "reservas": 563750,
+        "resultado_ejercicio": 146250,
+        "deudas_bancarias_lp": 560000,
+        "leasing_lp": 75000,
+        "deudas_bancarias_cp": 200000,
+        "leasing_cp": 18000,
+        "proveedores": 390000,
+        "otros_acreedores": 127000
+      },
+      "pyg": {
+        "ventas": 3900000,
+        "aprovisionamientos": -2691000,
+        "otros_ingresos_explotacion": 15000,
+        "gastos_personal": -580000,
+        "otros_gastos_explotacion": -310000,
+        "amortizacion": -85000,
+        "ingresos_financieros": 1000,
+        "gastos_financieros": -55000,
+        "impuesto_beneficios": -48750
+      }
+    }
+  ],
+  "deuda": [
+    {
+      "entidad": "Banco A",
+      "tipo": "prestamo",
+      "descripcion": "Préstamo ICO ampliación almacén",
+      "pendiente": 380000,
+      "tipo_interes": 4.2,
+      "cuota_mensual": 7050,
+      "vencimiento": "2030-12",
+      "garantia": "ICO 70 % + aval personal socios"
+    },
+    {
+      "entidad": "Banco B",
+      "tipo": "prestamo",
+      "descripcion": "Préstamo circulante",
+      "pendiente": 260000,
+      "tipo_interes": 6.9,
+      "cuota_mensual": 6200,
+      "vencimiento": "2029-10",
+      "garantia": "Aval personal socios"
+    },
+    {
+      "entidad": "Banco A",
+      "tipo": "poliza",
+      "descripcion": "Póliza de crédito",
+      "pendiente": 260000,
+      "limite": 300000,
+      "tipo_interes": 5.5,
+      "vencimiento": "2026-05",
+      "garantia": "Personal"
+    },
+    {
+      "entidad": "Banco C",
+      "tipo": "poliza",
+      "descripcion": "Póliza de crédito",
+      "pendiente": 220000,
+      "limite": 300000,
+      "tipo_interes": 5.25,
+      "vencimiento": "2027-02",
+      "garantia": ""
+    },
+    {
+      "entidad": "Banco B",
+      "tipo": "leasing",
+      "descripcion": "Leasing furgonetas",
+      "pendiente": 65000,
+      "tipo_interes": 5,
+      "cuota_mensual": 1750,
+      "vencimiento": "2029-06",
+      "garantia": ""
+    },
+    {
+      "entidad": "Renting Car",
+      "tipo": "renting",
+      "descripcion": "Vehículos comerciales",
+      "cuota_mensual": 2400,
+      "vencimiento": "2028-03"
+    }
+  ]
+}

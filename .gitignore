@@ -25,3 +25,7 @@ dist-ssr
 
 # Versión de un único archivo (npm run build:artifact)
 artifact
+
+# Datos y trabajos de clientes del agente director-financiero (confidenciales)
+clientes/
+__pycache__/

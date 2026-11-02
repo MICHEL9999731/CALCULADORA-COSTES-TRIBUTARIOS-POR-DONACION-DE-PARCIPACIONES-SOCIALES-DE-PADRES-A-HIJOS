@@ -34,6 +34,15 @@ En `.claude/agents/` hay un agente director financiero con dos subagentes especi
 | `cfo-operativo` | Funciones de un director financiero: diagnóstico de liquidez (fondo de maniobra, NOF, ciclo de caja, previsión de tesorería), estructura del balance y de la deuda, decisiones operativas y preparación lícita del balance y del dosier para el banco (préstamos, pólizas, leasing, confirming, factoring, ICO, SGR, refinanciaciones), con simulación de ratios antes y después. |
 | `valorador-empresas` | Valoración de la empresa o de un porcentaje de participaciones para compraventas, entrada o salida de socios, ampliaciones, donaciones o herencias: métodos patrimoniales, DCF con WACC, capitalización de beneficios, múltiplos, métodos mixtos (UEC, indirecto, anglosajón) y valores fiscales (art. 37.1.b LIRPF, art. 16 LIP, ISD). Explica cada cálculo y propone un rango, un valor recomendado y la estructura del precio. |
 
+Los cálculos se hacen con las herramientas de `herramientas/finanzas/` (Python 3, sin dependencias), para que las cifras sean comprobables y repetibles:
+
+- `plantilla_datos.json`: formato de los datos del cliente (balance y PyG de 2 a 5 ejercicios por partidas del PGC y cuadro de deuda). `ejemplo_empresa.json` es una empresa ficticia completa.
+- `analisis.py datos.json [--ajustes ajustes.json]`: ratios, NOF, ciclo de caja, flujos, servicio de la deuda y DSCR, capacidad de endeudamiento, causa de disolución, Altman, ratios bancarios y simulación antes/después de medidas sobre el balance (`ajustes_ejemplo.json`).
+- `valoracion.py datos.json [--hipotesis hipotesis.json]`: todos los métodos con fórmula y cálculo explicado, sensibilidad del DCF, valores fiscales, ponderación y valor del paquete (`hipotesis_ejemplo.json`).
+- Pruebas: `python3 -m unittest discover -s herramientas/finanzas`.
+
+El agente guarda el trabajo de cada cliente en `clientes/<empresa>/`, carpeta excluida de git para que los datos confidenciales no se suban al repositorio.
+
 Cómo usarlo, dentro de este repositorio:
 
 - Escriba `/director-financiero <encargo>` en una sesión de Claude Code, adjuntando o indicando la ruta de los documentos. Por ejemplo: `/director-financiero analiza las cuentas de 2023-2025 de docs/acme y prepara la solicitud de una póliza de 300.000 €`.

@@ -1,0 +1,11 @@
+[
+  {"concepto": "Reclasificar a LP la parte a más de 12 meses del préstamo circulante",
+   "justificacion": "El préstamo vence en 2029; en el balance figuraba entero a corto plazo. Corrección conforme al PGC (NRV 9.ª y modelo de balance).",
+   "movimientos": {"deudas_bancarias_cp": -190000, "deudas_bancarias_lp": 190000}},
+  {"concepto": "Aportación de socios de 150.000 € para cancelar póliza",
+   "justificacion": "Aportación dineraria (cuenta 118) aplicada a reducir la disposición de la póliza antes del cierre.",
+   "movimientos": {"otras_aportaciones_socios": 150000, "deudas_bancarias_cp": -150000}},
+  {"concepto": "Sanear clientes incobrables",
+   "justificacion": "Deterioro de 40.000 € de saldos con más de 12 meses de antigüedad; efecto fiscal (art. 13.1 LIS) a revisar.",
+   "movimientos": {"clientes": -40000, "resultado_ejercicio": -40000}}
+]

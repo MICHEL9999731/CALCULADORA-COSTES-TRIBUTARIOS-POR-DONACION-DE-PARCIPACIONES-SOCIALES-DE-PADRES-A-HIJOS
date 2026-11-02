@@ -1,0 +1,7 @@
+{
+  "porcentaje": 30,
+  "rf": 3.2,
+  "ajuste_retribucion_socios": 20000,
+  "descuento_minoria": 15,
+  "pesos": {"dcf": 40, "ve_ebitda": 30, "uec": 15, "ajustado": 15}
+}
