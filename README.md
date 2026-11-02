@@ -40,6 +40,17 @@ Los datos se pueden introducir a mano, pegar desde Excel / el programa de contab
 
 El motor de cálculo está en `financial/engine.ts` y sus pruebas en `financial/engine.test.ts` (`npm test`).
 
+### Valoración de empresas
+Con los mismos datos (cuentas anuales de 2 a 5 ejercicios, cargadas desde documentos, pegadas o a mano; se comparten con «Dirección financiera») valora automáticamente los fondos propios por:
+
+- **Patrimoniales**: valor contable, valor contable ajustado (plusvalías latentes netas de impuesto y contingencias) y valor de liquidación.
+- **Rendimiento**: descuento de flujos de caja libres (DCF a 5 años + valor residual, WACC por CAPM con beta sectorial reapalancada, prima por tamaño y específica, tabla de sensibilidad WACC × g) y capitalización del beneficio normalizado.
+- **Mercado**: múltiplos VE/EBITDA, VE/Ventas y PER con referencias sectoriales de PYMES no cotizadas.
+- **Mixtos**: UEC, método indirecto (alemán) y anglosajón.
+- **Valores fiscales**: valor teórico, capitalización al 20 % de los beneficios, mínimo IRPF (art. 37.1.b LIRPF) e Impuesto sobre el Patrimonio (art. 16 LIP).
+
+Detecta el perfil de la empresa (operativa, patrimonial o en pérdidas), pondera los métodos aplicables y propone un rango y un valor concluido, para el 100 % o para el porcentaje que se transmite, y por participación. Todas las hipótesis tienen un valor automático que se puede sustituir y se guardan con el cliente. El motor está en `financial/valuation.ts` y sus pruebas en `financial/valuation.test.ts`.
+
 ### Calculadora de donaciones
 Estima el coste fiscal (IRPF, ISD) de donar participaciones de padres a hijos en la Comunidad de Madrid.
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { DonationCalculator } from './components/DonationCalculator';
 import { FinancialDirector } from './components/financial/FinancialDirector';
 
-type Tool = 'financiero' | 'donaciones';
+type Tool = 'financiero' | 'valoracion' | 'donaciones';
 
 const App: React.FC = () => {
     const [tool, setTool] = useState<Tool>('financiero');
@@ -12,6 +12,7 @@ const App: React.FC = () => {
             <nav className="max-w-6xl mx-auto mb-8 flex flex-wrap gap-2 justify-center print:hidden">
                 {([
                     ['financiero', 'Dirección financiera'],
+                    ['valoracion', 'Valoración de empresas'],
                     ['donaciones', 'Calculadora de donaciones'],
                 ] as const).map(([id, label]) => (
                     <button
@@ -31,16 +32,18 @@ const App: React.FC = () => {
                 <div className="max-w-6xl mx-auto">
                     <header className="text-center mb-8 print:hidden">
                         <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-500 mb-2">
-                            Dirección Financiera
+                            {tool === 'valoracion' ? 'Valoración de Empresas' : 'Dirección Financiera'}
                         </h1>
                         <p className="text-lg text-slate-400">
-                            Introduzca el balance y la cuenta de pérdidas y ganancias de 2 a 5 ejercicios, y su cuadro de financiación, y obtenga el análisis, diagnóstico y plan de acción de un director financiero.
+                            {tool === 'valoracion'
+                                ? 'Cargue las cuentas anuales de 2 a 5 ejercicios y obtenga automáticamente el valor de la empresa por métodos patrimoniales, DCF, múltiplos, mixtos y fiscales, con un rango y un valor concluido.'
+                                : 'Introduzca el balance y la cuenta de pérdidas y ganancias de 2 a 5 ejercicios, y su cuadro de financiación, y obtenga el análisis, diagnóstico y plan de acción de un director financiero.'}
                         </p>
                     </header>
-                    <FinancialDirector />
+                    <FinancialDirector key={tool} mode={tool === 'valoracion' ? 'valuation' : 'analysis'} />
                     <footer className="text-center mt-12 text-sm text-slate-500 print:hidden">
                         <p>
-                            <strong>Aviso:</strong> Análisis automático basado en la información contable facilitada. Las referencias sectoriales son orientativas.
+                            <strong>Aviso:</strong> {tool === 'valoracion' ? 'Valoración automática basada en la información contable facilitada y en referencias sectoriales orientativas (múltiplos, betas, primas de riesgo). ' : 'Análisis automático basado en la información contable facilitada. Las referencias sectoriales son orientativas. '}
                             Las conclusiones deben revisarse por un profesional antes de trasladarse al cliente.
                         </p>
                     </footer>

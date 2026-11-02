@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { analyze } from '../../financial/engine';
+import { valueCompany } from '../../financial/valuation';
+import { ValuationReport } from '../valuation/ValuationReport';
 import { emptyDataset, migrateDataset, type FinancialDataset } from '../../financial/schema';
 import { sampleDataset } from '../../financial/sampleData';
 import { buildDebtTemplateCsv, buildTemplateCsv } from '../../financial/importer';
@@ -35,7 +37,10 @@ const pageCss = (): string =>
 
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
-export const FinancialDirector: React.FC = () => {
+export type DirectorMode = 'analysis' | 'valuation';
+
+export const FinancialDirector: React.FC<{ mode?: DirectorMode }> = ({ mode = 'analysis' }) => {
+    const isValuation = mode === 'valuation';
     const initial = useMemo(loadStored, []);
     const [data, setDataRaw] = useState<FinancialDataset>(initial.data);
     const [isSample, setIsSample] = useState(initial.isSample);
@@ -60,7 +65,8 @@ export const FinancialDirector: React.FC = () => {
         return () => clearTimeout(t);
     }, [notice]);
 
-    const analysis = useMemo(() => (view === 'report' ? analyze(data) : null), [data, view]);
+    const analysis = useMemo(() => (view === 'report' && !isValuation ? analyze(data) : null), [data, view, isValuation]);
+    const valuation = useMemo(() => (view === 'report' && isValuation ? valueCompany(data) : null), [data, view, isValuation]);
     const hasData = Object.values(data.years[0].values).some(v => v !== 0);
 
     const report = (outcome: SaveOutcome, what: string) => {
@@ -76,12 +82,12 @@ export const FinancialDirector: React.FC = () => {
             if (exporting === 'print') {
                 window.print();
             } else if (reportRef.current) {
-                const title = `Informe financiero ${data.company.name || ''} ${data.years[0].year}`.trim();
+                const title = `${isValuation ? 'Valoración' : 'Informe financiero'} ${data.company.name || ''} ${data.years[0].year}`.trim();
                 const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${pageCss()}</style></head>`
                     + `<body class="bg-slate-900 text-slate-200"><div class="max-w-6xl mx-auto p-6">`
                     + `<p class="print:hidden text-sm text-slate-400 mb-6">Para guardarlo en PDF pulse Ctrl+P (Cmd+P en Mac) y elija «Guardar como PDF»: se imprimirá en fondo blanco.</p>`
                     + reportRef.current.innerHTML + `</div></body></html>`;
-                await offer(`informe-${clientId(data)}-${data.years[0].year}.html`, html, 'text/html', 'Informe');
+                await offer(`${isValuation ? 'valoracion' : 'informe'}-${clientId(data)}-${data.years[0].year}.html`, html, 'text/html', 'Informe');
             }
             setExporting(null);
         }, 300);
@@ -137,7 +143,7 @@ export const FinancialDirector: React.FC = () => {
                     )}
                     {view === 'input' && (
                         <button type="button" disabled={!hasData} className="px-5 py-2 rounded-md font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={toReport}>
-                            Generar informe →
+                            {isValuation ? 'Valorar la empresa →' : 'Generar informe →'}
                         </button>
                     )}
                 </div>
@@ -151,7 +157,7 @@ export const FinancialDirector: React.FC = () => {
 
             {isSample && (
                 <div className="print:hidden px-4 py-3 rounded-md border border-amber-700 bg-amber-950/30 text-sm text-amber-100">
-                    Está viendo <strong>Distribuciones Ejemplo, S.L.</strong>, una empresa ficticia para probar la herramienta. Pulse «Generar informe» para ver el resultado, o «Cargar documentos» para trabajar con un cliente real.
+                    Está viendo <strong>Distribuciones Ejemplo, S.L.</strong>, una empresa ficticia para probar la herramienta. Pulse «{isValuation ? 'Valorar la empresa' : 'Generar informe'}» para ver el resultado, o «Cargar documentos» para trabajar con un cliente real.
                 </div>
             )}
 
@@ -181,8 +187,18 @@ export const FinancialDirector: React.FC = () => {
             {view === 'input' && (
                 <div className="flex justify-end">
                     <button type="button" disabled={!hasData} className="px-6 py-3 rounded-md text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40" onClick={toReport}>
-                        Generar informe del director financiero →
+                        {isValuation ? 'Valorar la empresa por todos los métodos →' : 'Generar informe del director financiero →'}
                     </button>
+                </div>
+            )}
+
+            {view === 'report' && valuation && (
+                <div ref={reportRef}>
+                    <div className={exporting ? 'mb-6' : 'hidden print:block mb-6'}>
+                        <h1 className="text-3xl font-bold">Informe de valoración</h1>
+                        <p>{data.company.name} {data.company.cif && `· ${data.company.cif}`} · Ejercicios {data.years[data.years.length - 1].year}-{data.years[0].year} · Emitido el {new Date().toLocaleDateString('es-ES')}</p>
+                    </div>
+                    <ValuationReport valuation={valuation} printAll={!!exporting} onInputsChange={vi => setData({ ...data, valuation: vi })} />
                 </div>
             )}
 

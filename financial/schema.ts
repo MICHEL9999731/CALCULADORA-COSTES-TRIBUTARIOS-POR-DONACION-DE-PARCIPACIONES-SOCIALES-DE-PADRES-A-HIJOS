@@ -1,6 +1,8 @@
 // Partidas del balance y de la cuenta de pérdidas y ganancias según el
 // Plan General de Contabilidad (modelo normal / abreviado), agrupadas para el análisis.
 
+import type { ValuationInputs } from './valuation';
+
 export type BalanceSection =
     | 'anc'   // Activo no corriente
     | 'ac'    // Activo corriente
@@ -225,6 +227,8 @@ export interface FinancialDataset {
     /** Ejercicios ordenados del más reciente al más antiguo (mínimo 2, máximo 5). */
     years: YearData[];
     debts: DebtItem[];
+    /** Hipótesis de valoración modificadas por el usuario (opcional). */
+    valuation?: ValuationInputs;
 }
 
 export const emptyYear = (): YearValues =>
@@ -284,5 +288,14 @@ export const migrateDataset = (raw: any): FinancialDataset => {
     }
     while (years.length < 2) years.push(emptyYearData(years[years.length - 1].year - 1));
     const debts: DebtItem[] = Array.isArray(raw.debts) ? raw.debts.map((d: Partial<DebtItem>) => ({ ...newDebtItem(), ...d })) : [];
-    return { version: 2, company, years, debts };
+    const out: FinancialDataset = { version: 2, company, years, debts };
+    if (raw.valuation && typeof raw.valuation === 'object') {
+        out.valuation = {
+            overrides: { ...(raw.valuation.overrides ?? {}) },
+            weights: { ...(raw.valuation.weights ?? {}) },
+            earningsBase: raw.valuation.earningsBase === 'average' ? 'average' : 'last',
+            audited: !!raw.valuation.audited,
+        };
+    }
+    return out;
 };
