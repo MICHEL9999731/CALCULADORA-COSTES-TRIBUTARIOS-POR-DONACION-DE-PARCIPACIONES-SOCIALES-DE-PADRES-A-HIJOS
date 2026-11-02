@@ -17,48 +17,25 @@ View your app in AI Studio: https://ai.studio/apps/drive/1qUB1kF6F8BLRWHc0adlTcq
    `npm install`
 2. Run the app:
    `npm run dev`
-3. Tests and checks: `npm test` y `npm run typecheck`
+3. Comprobación de tipos: `npm run typecheck`
 
-## Herramientas incluidas
-
-### Dirección financiera
-A partir del **balance y la cuenta de pérdidas y ganancias de 2 a 5 ejercicios** (formato PGC) y, opcionalmente, del **cuadro de financiación** (préstamos, hipotecas, leasing, renting, pólizas, préstamos de socios y aplazamientos), genera el informe de un director financiero:
-
-- **Resumen ejecutivo** con una valoración global (0-100) y los principales indicadores.
-- **Diagnóstico** de fortalezas y debilidades, y **plan de acción** priorizado con el impacto estimado en euros.
-- **Análisis horizontal y vertical** del balance y de la PyG analítica (margen bruto, EBITDA, EBIT…).
-- **Ratios** de liquidez, solvencia, rentabilidad (ROE, ROA, ROCE, apalancamiento), márgenes, circulante (PMC, PMP, existencias, ciclo de caja), crecimiento y productividad, valorados con referencias por sector.
-- **Fondo de maniobra frente a NOF**, deuda financiera neta, capacidad de endeudamiento, DSCR y años de devolución.
-- **Estado de flujos de efectivo** estimado (método indirecto), conciliado con la variación de tesorería.
-- **Riesgo**: Z-score de Altman, punto muerto, causa de disolución (art. 363 LSC) y reducción obligatoria de capital (art. 327 LSC).
-- **Evolución plurianual**: crecimiento medio anual, tendencias de márgenes, deuda, circulante y caja libre acumulada.
-- **Calendario de deuda**: cuotas de principal, intereses y renting de los próximos 5 años frente a la caja operativa (DSCR por año), coste medio ponderado, disponible en pólizas, vencimientos a renovar, avales personales y deuda más cara a cancelar.
-- **Simulador** de palancas (ventas, margen, costes, días de cobro/pago/existencias).
-- Lista de **información a solicitar al cliente**.
-
-Los datos se pueden introducir a mano, pegar desde Excel / el programa de contabilidad / el depósito de cuentas, o cargar con la plantilla CSV. El cuadro de financiación se puede pegar desde Excel (plantilla «Descargar cuadro de deuda»). Cada cliente se puede guardar y abrir en `.json`, y el informe se imprime o exporta a PDF.
-
-El motor de cálculo está en `financial/engine.ts` y sus pruebas en `financial/engine.test.ts` (`npm test`).
-
-### Valoración de empresas
-Con los mismos datos (cuentas anuales de 2 a 5 ejercicios, cargadas desde documentos, pegadas o a mano; se comparten con «Dirección financiera») valora automáticamente los fondos propios por:
-
-- **Patrimoniales**: valor contable, valor contable ajustado (plusvalías latentes netas de impuesto y contingencias) y valor de liquidación.
-- **Rendimiento**: descuento de flujos de caja libres (DCF a 5 años + valor residual, WACC por CAPM con beta sectorial reapalancada, prima por tamaño y específica, tabla de sensibilidad WACC × g) y capitalización del beneficio normalizado.
-- **Mercado**: múltiplos VE/EBITDA, VE/Ventas y PER con referencias sectoriales de PYMES no cotizadas.
-- **Mixtos**: UEC, método indirecto (alemán) y anglosajón.
-- **Valores fiscales**: valor teórico, capitalización al 20 % de los beneficios, mínimo IRPF (art. 37.1.b LIRPF) e Impuesto sobre el Patrimonio (art. 16 LIP).
-
-Detecta el perfil de la empresa (operativa, patrimonial o en pérdidas), pondera los métodos aplicables y propone un rango y un valor concluido, para el 100 % o para el porcentaje que se transmite, y por participación. Todas las hipótesis tienen un valor automático que se puede sustituir y se guardan con el cliente. El motor está en `financial/valuation.ts` y sus pruebas en `financial/valuation.test.ts`.
-
-### Calculadora de donaciones
+## Calculadora de donaciones
 Estima el coste fiscal (IRPF, ISD) de donar participaciones de padres a hijos en la Comunidad de Madrid.
 
-## Usarlo sin instalar nada (claude.ai)
+`npm run build:artifact` genera `artifact/calculadora-donaciones.html`, la calculadora en un único archivo HTML para publicarla en claude.ai o abrirla en el navegador.
 
-`npm run build:artifact` genera `artifact/direccion-financiera.html`, la aplicación completa en un único archivo, que se publica como Artifact en claude.ai. En esa versión:
+## Agente «director-financiero» (Claude Code)
 
-- **Cargar documentos (Excel / PDF)**: lee cuentas anuales, balances, cuentas de resultados, cuadros de amortización, leasing, renting y pólizas, y rellena los datos. Los cuadros de amortización se comprueban fila a fila (pendiente anterior − amortización = pendiente; cuota = intereses + amortización) y las cuentas con el cuadre del balance y del resultado; si algo no cuadra se pide una relectura dirigida y lo que siga sin cuadrar se señala antes de aplicar. La lectura de PDF y de formatos libres usa Claude desde la propia página; en local solo se leen Excel/CSV con epígrafes del PGC.
-- **Mis clientes** guarda cada cliente en el espacio privado del usuario en claude.ai (en local, en el navegador).
-- **Descargar informe** genera un HTML con el informe completo; al abrirlo, Ctrl+P / Cmd+P lo guarda en PDF con fondo blanco.
-- Las plantillas y el archivo `.json` del cliente se descargan con confirmación del usuario.
+En `.claude/agents/` hay un agente director financiero con dos subagentes especializados:
+
+| Agente | Función |
+|---|---|
+| `director-financiero` | CFO externo de PYMES españolas. Lee y cuadra la documentación del cliente (cuentas anuales, sumas y saldos, pool bancario, CIRBE, cuadros de amortización), reparte el trabajo entre los subagentes, integra sus conclusiones y entrega un único informe. |
+| `cfo-operativo` | Funciones de un director financiero: diagnóstico de liquidez (fondo de maniobra, NOF, ciclo de caja, previsión de tesorería), estructura del balance y de la deuda, decisiones operativas y preparación lícita del balance y del dosier para el banco (préstamos, pólizas, leasing, confirming, factoring, ICO, SGR, refinanciaciones), con simulación de ratios antes y después. |
+| `valorador-empresas` | Valoración de la empresa o de un porcentaje de participaciones para compraventas, entrada o salida de socios, ampliaciones, donaciones o herencias: métodos patrimoniales, DCF con WACC, capitalización de beneficios, múltiplos, métodos mixtos (UEC, indirecto, anglosajón) y valores fiscales (art. 37.1.b LIRPF, art. 16 LIP, ISD). Explica cada cálculo y propone un rango, un valor recomendado y la estructura del precio. |
+
+Cómo usarlo, dentro de este repositorio:
+
+- Escriba `/director-financiero <encargo>` en una sesión de Claude Code, adjuntando o indicando la ruta de los documentos. Por ejemplo: `/director-financiero analiza las cuentas de 2023-2025 de docs/acme y prepara la solicitud de una póliza de 300.000 €`.
+- O bien inicie Claude Code directamente como el agente: `claude --agent director-financiero`.
+- Los subagentes también se pueden llamar por separado («usa el subagente valorador-empresas para…»).

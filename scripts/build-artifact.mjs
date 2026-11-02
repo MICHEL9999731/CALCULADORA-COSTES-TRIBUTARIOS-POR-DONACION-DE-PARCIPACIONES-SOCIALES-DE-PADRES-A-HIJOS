@@ -1,4 +1,4 @@
-// Genera artifact/direccion-financiera.html: la aplicación completa en un único
+// Genera artifact/calculadora-donaciones.html: la aplicación completa en un único
 // archivo HTML (JS y CSS incrustados, sin dependencias externas), lista para
 // publicarse en claude.ai como Artifact o abrirse directamente en el navegador.
 import { execSync } from 'node:child_process';
@@ -18,7 +18,7 @@ const tailwind = readFileSync(join(root, 'dist/tailwind.css'), 'utf8');
 const indexHtml = readFileSync(join(root, 'index.html'), 'utf8');
 const ownStyles = [...indexHtml.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
 
-const html = `<title>Dirección Financiera</title>
+const html = `<title>Calculadora de Donaciones</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 ${tailwind}
@@ -37,6 +37,6 @@ ${js}
 `;
 
 mkdirSync(join(root, 'artifact'), { recursive: true });
-const out = join(root, 'artifact/direccion-financiera.html');
+const out = join(root, 'artifact/calculadora-donaciones.html');
 writeFileSync(out, html);
 console.log(`\n✓ ${out} (${(html.length / 1024).toFixed(0)} KB)`);
